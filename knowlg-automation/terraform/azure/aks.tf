@@ -19,3 +19,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
       var.additional_tags
       )
 }
+
+module "modules" {
+  source         = "../modules"
+  environment    = var.environment
+  cluster_dependency = azurerm_kubernetes_cluster.aks
+  kafka_dependency = helm_release.kafka
+}

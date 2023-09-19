@@ -49,3 +49,11 @@ resource "kind_cluster" "one-click" {
   }
 
 }
+
+module "modules" {
+  source                = "../modules"
+  environment           = var.environment
+  cluster_dependency    = kind_cluster.one-click
+  kafka_dependency      = helm_release.kafka
+
+}

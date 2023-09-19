@@ -248,3 +248,9 @@ variable "flink_kubernetes_service_name" {
     description = "Flink kubernetes service name."
     default     = "asset-enrichment-jobmanager"
 }
+
+variable "environment" {
+  type        = string
+  description = "Environment value"
+  default     = "azure"
+}
