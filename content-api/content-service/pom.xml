@@ -147,12 +147,13 @@
                     <artifactId>netty-codec-http</artifactId>
                 </exclusion>
             </exclusions>
-            <dependency>
+            
+        </dependency>
+        <dependency>
            <groupId>io.netty</groupId>
            <artifactId>netty-codec-http</artifactId>
            <version>4.1.44.Final</version>
       </dependency> 
-        </dependency>
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
