@@ -3,23 +3,22 @@ package org.sunbird.actors
 import org.apache.commons.lang3.StringUtils
 import org.sunbird.actor.core.BaseActor
 import org.sunbird.cache.impl.RedisCache
-import org.sunbird.common.{JsonUtils, Platform, Slug}
 import org.sunbird.common.dto.{Request, Response, ResponseHandler}
 import org.sunbird.common.exception.ClientException
+import org.sunbird.common.{JsonUtils, Platform}
 import org.sunbird.graph.OntologyEngineContext
-import org.sunbird.graph.dac.model.{Node, SubGraph}
+import org.sunbird.graph.dac.model.SubGraph
 import org.sunbird.graph.nodes.DataNode
 import org.sunbird.graph.path.DataSubGraph
 import org.sunbird.graph.utils.{NodeUtil, ScalaJsonUtils}
 import org.sunbird.mangers.FrameworkManager
-import org.sunbird.utils.{CategoryCache, FrameworkCache}
-import org.sunbird.utils.{Constants, RequestUtil}
+import org.sunbird.utils.{CategoryCache, Constants, FrameworkCache, RequestUtil}
 
 import java.util
 import javax.inject.Inject
+import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.collection.JavaConversions._
 
 class FrameworkActor @Inject()(implicit oec: OntologyEngineContext) extends BaseActor {
 
@@ -33,6 +32,8 @@ class FrameworkActor @Inject()(implicit oec: OntologyEngineContext) extends Base
       case Constants.RETIRE_FRAMEWORK => retire(request)
       case Constants.PUBLISH_FRAMEWORK => publish(request)
       case Constants.COPY_FRAMEWORK => copy(request)
+      case Constants.REVIEW_FRAMEWORK => review(request)
+      case Constants.REJECT_FRAMEWORK => reject(request)
       case _ => ERROR(request.getOperation)
     }
   }
@@ -70,38 +71,32 @@ class FrameworkActor @Inject()(implicit oec: OntologyEngineContext) extends Base
   @throws[Exception]
   private def read(request: Request): Future[Response] = {
     val frameworkId = request.get("identifier").asInstanceOf[String]
-    val returnCategories: java.util.List[String] = seqAsJavaListConverter(request.get("categories").asInstanceOf[String].split(",").filter(category => StringUtils.isNotBlank(category) && !StringUtils.equalsIgnoreCase(category, "null"))).asJava
+    val mode = request.get("mode").asInstanceOf[String]
+    val returnCategories: java.util.List[String] = seqAsJavaListConverter(
+      request.get("categories").asInstanceOf[String].split(",")
+        .filter(category => StringUtils.isNotBlank(category) && !StringUtils.equalsIgnoreCase(category, "null"))).asJava
     request.getRequest.put("categories", returnCategories)
-    if (StringUtils.isNotBlank(frameworkId)) {
-      val framework = FrameworkCache.get(frameworkId, returnCategories)
-      if(framework != null){
-        Future {
-          ResponseHandler.OK.put(Constants.FRAMEWORK, framework)
+    
+    if (StringUtils.isBlank(frameworkId))
+      throw new ClientException("ERR_INVALID_REQUEST", "Invalid Request. Please Provide Required Properties!")
+    else if (null != mode && StringUtils.equalsAnyIgnoreCase(mode, "edit")) {
+      getConstructedFramework(frameworkId, request).flatMap { fwHierarchy =>
+        if (fwHierarchy != null && fwHierarchy.nonEmpty) {
+          Future { ResponseHandler.OK.put(Constants.FRAMEWORK, fwHierarchy) }
         }
-      } else {
-        val frameworkData: Future[Map[String, AnyRef]] = if (Platform.getBoolean("service.db.cassandra.enabled", true))
-          FrameworkManager.getFrameworkHierarchy(request) else {
-          val frameworkStr = RedisCache.get("fw:"+frameworkId, (key: String) => "{}")
-          Future(JsonUtils.deserialize(frameworkStr, classOf[java.util.Map[String, AnyRef]]).toMap)
-        }
-        frameworkData.map(framework => {
-          if (framework.isEmpty) {
-            DataNode.read(request).map(node => {
-              if (null != node && StringUtils.equalsAnyIgnoreCase(node.getIdentifier, frameworkId)) {
-                val framework = NodeUtil.serialize(node, null, request.getContext.get(Constants.SCHEMA_NAME).asInstanceOf[String], request.getContext.get(Constants.VERSION).asInstanceOf[String])
-                ResponseHandler.OK.put(Constants.FRAMEWORK, framework)
-              } else throw new ClientException("ERR_INVALID_REQUEST", "Invalid Request. Please Provide Required Properties!")
-            })
-          } else {
-            Future {
-              val filterFrameworkData  = FrameworkManager.filterFrameworkCategories(framework, returnCategories)
-              FrameworkCache.save(filterFrameworkData, returnCategories)
-              ResponseHandler.OK.put(Constants.FRAMEWORK, filterFrameworkData.asJava)
+        else {
+          DataNode.read(request).map { node =>
+            if (null != node && StringUtils.equalsAnyIgnoreCase(node.getIdentifier, frameworkId)) {
+              val framework = NodeUtil.serialize(node, null, request.getContext.get(Constants.SCHEMA_NAME).asInstanceOf[String], request.getContext.get(Constants.VERSION).asInstanceOf[String])
+              ResponseHandler.OK.put(Constants.FRAMEWORK, framework)
+            } else {
+              throw new ClientException("ERR_INVALID_REQUEST", "Invalid Request. Please Provide Required Properties!")
             }
           }
-        }).flatMap(f => f)
+        }
       }
-    } else throw new ClientException("ERR_INVALID_REQUEST", "Invalid Request. Please Provide Required Properties!")
+    }
+    else getFramework(frameworkId, returnCategories, request)
   }
 
   @throws[Exception]
@@ -161,6 +156,11 @@ class FrameworkActor @Inject()(implicit oec: OntologyEngineContext) extends Base
               req.put("identifier", frameworkId)
               oec.graphService.saveExternalProps(req)
             } else RedisCache.set("fw:"+frameworkId, hierarchy)
+            request.getContext.put("identifier", frameworkId)
+            request.put("status", "Live")
+            request.put("prevStatus", frameworkHierarchy.getOrDefault("prevStatus", ""))
+            request.put("lastStatusChangedOn", frameworkHierarchy.getOrDefault("lastStatusChangedOn", ""))
+            DataNode.update(request)
             ResponseHandler.OK.put(Constants.PUBLISH_STATUS, s"Publish Event for Framework Id '${frameworkId}' is pushed Successfully!")
           })
         } else throw new ClientException("ERR_INVALID_FRAMEWORK_ID", "Please provide valid framework identifier")
@@ -172,5 +172,99 @@ class FrameworkActor @Inject()(implicit oec: OntologyEngineContext) extends Base
   private def copy(request: Request): Future[Response] = {
     RequestUtil.restrictProperties(request)
     FrameworkManager.copyHierarchy(request)
+  }
+
+  @throws[Exception]
+  private def review(request: Request): Future[Response] = {
+    val identifier = request.getContext.getOrDefault(Constants.IDENTIFIER, "").asInstanceOf[String]
+    if (StringUtils.isBlank(identifier)) {
+      throw new ClientException("ERR_INVALID_REQUEST", "Framework identifier is required")
+    }
+    request.put(Constants.IDENTIFIER, identifier)
+    getConstructedFramework(identifier, request).flatMap { hierarchy =>
+      if (hierarchy != null && hierarchy.nonEmpty) {
+        FrameworkManager.reviewFramework(identifier, request, hierarchy)
+      }
+      else {
+        DataNode.read(request).flatMap { node =>
+          if (node != null && StringUtils.equalsIgnoreCase(node.getIdentifier, identifier)) {
+            val framework = NodeUtil.serialize(node, null, request.getContext.get(Constants.SCHEMA_NAME).asInstanceOf[String], request.getContext.get(Constants.VERSION).asInstanceOf[String])
+            FrameworkManager.reviewFramework(identifier, request, framework)
+          } else {
+            throw new ClientException("ERR_FRAMEWORK_NOT_FOUND", s"Framework not found with identifier: $identifier")
+          }
+        }
+      }
+    }
+  }
+
+  @throws[Exception]
+  def reject(request: Request): Future[Response] = {
+    RequestUtil.validateRequest(request)
+    DataNode.read(request).map(node => {
+      val status = node.getMetadata.get(Constants.STATUS).asInstanceOf[String]
+      if (StringUtils.isBlank(status))
+        throw new ClientException("ERR_METADATA_ISSUE", "Framework metadata error, status is blank for identifier:" + node.getIdentifier)
+      if (StringUtils.equals("Review", status)) {
+        request.getRequest.put(Constants.STATUS, "Draft")
+        request.getRequest.put("prevStatus", "Review")
+      }
+      else new ClientException("ERR_INVALID_REQUEST", "Framework not in Review status.")
+      request.getRequest.put("versionKey", node.getMetadata.get("versionKey"))
+      request.putIn("publishChecklist", null).putIn("publishComment", null)
+      RequestUtil.restrictProperties(request)
+      DataNode.update(request).map(node => {
+        val identifier: String = node.getIdentifier.replace(".img", "")
+        ResponseHandler.OK.put("node_id", identifier).put(Constants.IDENTIFIER, identifier)
+      })
+    }).flatMap(f => f)
+  }
+
+  private def getFramework(frameworkId: String, returnCategories:java.util.List[String], request: Request) : Future[Response] = {
+    val framework = FrameworkCache.get(frameworkId, returnCategories)
+    if (framework != null) {
+      Future {
+        ResponseHandler.OK.put(Constants.FRAMEWORK, framework)
+      }
+    } else {
+      val frameworkData: Future[Map[String, AnyRef]] = if (Platform.getBoolean("service.db.cassandra.enabled", true))
+        FrameworkManager.getFrameworkHierarchy(request) else {
+        val frameworkStr = RedisCache.get("fw:" + frameworkId, (key: String) => "{}")
+        Future(JsonUtils.deserialize(frameworkStr, classOf[java.util.Map[String, AnyRef]]).toMap)
+      }
+      frameworkData.map(framework => {
+        if (framework.isEmpty) {
+          DataNode.read(request).map(node => {
+            if (null != node && StringUtils.equalsAnyIgnoreCase(node.getIdentifier, frameworkId)) {
+              val framework = NodeUtil.serialize(node, null, request.getContext.get(Constants.SCHEMA_NAME).asInstanceOf[String], request.getContext.get(Constants.VERSION).asInstanceOf[String])
+              ResponseHandler.OK.put(Constants.FRAMEWORK, framework)
+            } else throw new ClientException("ERR_INVALID_REQUEST", "Invalid Request. Please Provide Required Properties!")
+          })
+        } else {
+          Future {
+            val filterFrameworkData = FrameworkManager.filterFrameworkCategories(framework, returnCategories)
+            FrameworkCache.save(filterFrameworkData, returnCategories)
+            ResponseHandler.OK.put(Constants.FRAMEWORK, filterFrameworkData.asJava)
+          }
+        }
+      }).flatMap(f => f)
+    }
+  }
+
+  private def getConstructedFramework(frameworkId: String, request: Request)(implicit ec: ExecutionContext): Future[util.Map[String, AnyRef]] = {
+    DataSubGraph.read(request).flatMap { subGraph =>
+      if (subGraph.getNodes.isEmpty || subGraph.getRelations.isEmpty) {
+        Future { new util.HashMap[String, AnyRef]() }
+      } else {
+        Future { FrameworkManager.getCompleteMetadata(frameworkId, subGraph, true) }
+      }
+    }.recover {
+      case e: Exception => throw e.getCause
+        new util.HashMap[String, AnyRef]()
+    }
+  }
+
+  private def updateNode(identifier: String, req: Request) = {
+
   }
 }
