@@ -3,7 +3,7 @@ package org.sunbird.mangers
 import org.apache.commons.lang3.StringUtils
 import org.sunbird.common.dto.{Request, Response, ResponseHandler}
 import org.sunbird.common.exception.{ClientException, ServerException}
-import org.sunbird.common.{DateUtils, JsonUtils, Platform}
+import org.sunbird.common.{JsonUtils, Platform}
 import org.sunbird.graph.OntologyEngineContext
 import org.sunbird.graph.dac.model.{Relation, SubGraph}
 import org.sunbird.graph.nodes.DataNode
@@ -79,7 +79,7 @@ object FrameworkManager {
     val jsonProps = DefinitionNode.fetchJsonProps(node.getGraphId, schemaVersion, objectType, definition)
     val updatedMetadata: util.Map[String, AnyRef] = metadata.entrySet().asScala.filter(entry => null != entry.getValue)
       .map((entry: util.Map.Entry[String, AnyRef]) => handleKeyNames(entry, null) -> convertJsonProperties(entry, jsonProps)).toMap ++
-      Map("objectType" -> node.getObjectType, "identifier" -> node.getIdentifier, "languageCode" -> NodeUtil.getLanguageCodes(node), "prevStatus" -> node.getMetadata.get("status"), "status" -> "Live", "lastStatusChangedOn" -> DateUtils.formatCurrentDate)
+      Map("objectType" -> node.getObjectType, "identifier" -> node.getIdentifier, "languageCode" -> NodeUtil.getLanguageCodes(node))
     val fields =DefinitionNode.getMetadataFields(node.getGraphId, schemaVersion, objectType, definition)
     val filteredData: util.Map[String, AnyRef] = if(fields.nonEmpty) updatedMetadata.filterKeys(key => fields.contains(key)) else updatedMetadata
 

@@ -5,7 +5,7 @@ import org.sunbird.actor.core.BaseActor
 import org.sunbird.cache.impl.RedisCache
 import org.sunbird.common.dto.{Request, Response, ResponseHandler}
 import org.sunbird.common.exception.ClientException
-import org.sunbird.common.{JsonUtils, Platform}
+import org.sunbird.common.{DateUtils, JsonUtils, Platform}
 import org.sunbird.graph.OntologyEngineContext
 import org.sunbird.graph.dac.model.SubGraph
 import org.sunbird.graph.nodes.DataNode
@@ -148,6 +148,9 @@ class FrameworkActor @Inject()(implicit oec: OntologyEngineContext) extends Base
           val subGraph: Future[SubGraph] = DataSubGraph.read(request)
           subGraph.map(data => {
             val frameworkHierarchy = FrameworkManager.getCompleteMetadata(frameworkId, data, true)
+            frameworkHierarchy.put("prevStatus", frameworkHierarchy.getOrDefault("status", ""))
+            frameworkHierarchy.put("status", "Live")
+            frameworkHierarchy.put("lastStatusChangedOn", DateUtils.formatCurrentDate)
             CategoryCache.setFramework(frameworkId, frameworkHierarchy)
             val hierarchy = ScalaJsonUtils.serialize(frameworkHierarchy)
             if (Platform.getBoolean("service.db.cassandra.enabled", true)) {
