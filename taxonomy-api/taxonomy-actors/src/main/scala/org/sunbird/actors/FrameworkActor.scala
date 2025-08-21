@@ -212,7 +212,7 @@ class FrameworkActor @Inject()(implicit oec: OntologyEngineContext) extends Base
         request.getRequest.put(Constants.STATUS, "Draft")
         request.getRequest.put("prevStatus", "Review")
       }
-      else new ClientException("ERR_INVALID_REQUEST", "Framework not in Review status.")
+      else throw new ClientException("ERR_INVALID_REQUEST", "Framework not in Review status.")
       request.getRequest.put("versionKey", node.getMetadata.get("versionKey"))
       request.putIn("publishChecklist", null).putIn("publishComment", null)
       RequestUtil.restrictProperties(request)
@@ -259,15 +259,13 @@ class FrameworkActor @Inject()(implicit oec: OntologyEngineContext) extends Base
       if (subGraph.getNodes.isEmpty || subGraph.getRelations.isEmpty) {
         Future { new util.HashMap[String, AnyRef]() }
       } else {
-        Future { FrameworkManager.getCompleteMetadata(frameworkId, subGraph, true) }
+        Future { FrameworkManager.getCompleteMetadata(frameworkId, subGraph, includeRelations = true) }
       }
     }.recover {
-      case e: Exception => throw e.getCause
-        new util.HashMap[String, AnyRef]()
+      case e: Exception =>
+        if (e.getCause != null) throw e.getCause
+        else throw e
     }
   }
 
-  private def updateNode(identifier: String, req: Request) = {
-
-  }
 }

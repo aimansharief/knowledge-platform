@@ -253,7 +253,7 @@ object FrameworkManager {
   def reviewFramework(frameworkId: String, request: Request, frameworkHierarchy: util.Map[String, AnyRef])(implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Response] = {
     if (frameworkHierarchy != null && frameworkHierarchy.nonEmpty) {
       val fwObjectType = frameworkHierarchy.getOrDefault("objectType", "").asInstanceOf[String]
-      if (null != frameworkHierarchy & StringUtils.isNotBlank(fwObjectType))
+      if (null != frameworkHierarchy && StringUtils.isNotBlank(fwObjectType))
         request.getContext.put(Constants.SCHEMA_NAME, fwObjectType)
 
       if (StringUtils.equalsAnyIgnoreCase(Constants.PROCESSING, frameworkHierarchy.getOrDefault(Constants.STATUS, "").asInstanceOf[String]))
