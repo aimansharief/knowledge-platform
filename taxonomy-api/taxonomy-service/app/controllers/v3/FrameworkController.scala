@@ -3,13 +3,14 @@ package controllers.v3
 import akka.actor.{ActorRef, ActorSystem}
 import com.google.inject.Singleton
 import controllers.BaseController
-import javax.inject.{Inject, Named}
+import org.sunbird.common.dto.ResponseHandler
 import org.sunbird.utils.Constants
 import play.api.mvc.ControllerComponents
 import utils.{ActorNames, ApiId, JavaJsonUtils}
+
+import javax.inject.{Inject, Named}
 import scala.collection.JavaConverters._
-import scala.concurrent.{ExecutionContext,Future}
-import org.sunbird.common.dto.ResponseHandler
+import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class FrameworkController @Inject()(@Named(ActorNames.FRAMEWORK_ACTOR) frameworkActor: ActorRef, cc: ControllerComponents, actorSystem: ActorSystem)(implicit exec: ExecutionContext) extends BaseController(cc) {
@@ -25,11 +26,11 @@ class FrameworkController @Inject()(@Named(ActorNames.FRAMEWORK_ACTOR) framework
         getResult(ApiId.CREATE_FRAMEWORK, frameworkActor, frameworkRequest)
     }
 
-    def readFramework(identifier: String, fields: Option[String], categories: Option[String]) = Action.async { implicit request =>
+    def readFramework(identifier: String, fields: Option[String], categories: Option[String], mode: Option[String]) = Action.async { implicit request =>
         val headers = commonHeaders()
         val framework = new java.util.HashMap().asInstanceOf[java.util.Map[String, Object]]
         framework.putAll(headers)
-        framework.putAll(Map(Constants.IDENTIFIER -> identifier, Constants.CATEGORIES -> categories.getOrElse("")).asJava )
+        framework.putAll(Map(Constants.IDENTIFIER -> identifier, Constants.CATEGORIES -> categories.getOrElse(""), Constants.MODE -> mode.getOrElse("read")).asJava)
         val readRequest = getRequest(framework, headers, "readFramework")
         setRequestContext(readRequest, Constants.FRAMEWORK_SCHEMA_VERSION, objectType, Constants.FRAMEWORK_SCHEMA_NAME)
         getResult(ApiId.READ_FRAMEWORK, frameworkActor, readRequest)
@@ -56,7 +57,30 @@ class FrameworkController @Inject()(@Named(ActorNames.FRAMEWORK_ACTOR) framework
         frameworkRequest.getContext.put(Constants.IDENTIFIER, identifier)
         getResult(ApiId.UPDATE_FRAMEWORK, frameworkActor, frameworkRequest)
     }
-    
+
+    def reviewFramework(identifier: String) = Action.async { implicit request =>
+        val headers = commonHeaders()
+        val body = requestBody()
+        val framework = body.getOrDefault("framework", new java.util.HashMap()).asInstanceOf[java.util.Map[String, Object]];
+        framework.putAll(headers)
+        val frameworkRequest = getRequest(framework, headers, "reviewFramework")
+        setRequestContext(frameworkRequest, Constants.FRAMEWORK_SCHEMA_VERSION, objectType, Constants.FRAMEWORK_SCHEMA_NAME)
+        frameworkRequest.getContext.put(Constants.IDENTIFIER, identifier)
+        getResult(ApiId.REVIEW_FRAMEWORK, frameworkActor, frameworkRequest)
+    }
+
+    def rejectFramework(identifier: String) = Action.async { implicit request =>
+        val headers = commonHeaders()
+        val body = requestBody()
+        val framework = body.getOrDefault("framework", new java.util.HashMap()).asInstanceOf[java.util.Map[String, Object]];
+        framework.putAll(headers)
+        framework.putAll(Map("identifier" -> identifier).asJava)
+        val frameworkRequest = getRequest(framework, headers, "rejectFramework")
+        setRequestContext(frameworkRequest, Constants.FRAMEWORK_SCHEMA_VERSION, objectType, Constants.FRAMEWORK_SCHEMA_NAME)
+        frameworkRequest.getContext.put(Constants.IDENTIFIER, identifier)
+        getResult(ApiId.REJECT_FRAMEWORK, frameworkActor, frameworkRequest)
+    }
+
     def listFramework() = Action.async { implicit request =>
         val result = ResponseHandler.OK()
         val response = JavaJsonUtils.serialize(result)

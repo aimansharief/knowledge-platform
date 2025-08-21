@@ -13,6 +13,8 @@ object ApiId {
 	final val READ_FRAMEWORK = "api.taxonomy.framework.read"
 	final val UPDATE_FRAMEWORK = "api.taxonomy.framework.update"
 	final val RETIRE_FRAMEWORK = "api.taxonomy.framework.retire"
+	final val REVIEW_FRAMEWORK = "api.taxonomy.framework.review"
+	final val REJECT_FRAMEWORK = "api.taxonomy.framework.reject"
 	final val COPY_FRAMEWORK = "api.taxonomy.framework.copy"
 	final val PUBLISH_FRAMEWORK = "api.taxonomy.framework.publish"
 

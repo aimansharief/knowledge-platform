@@ -58,6 +58,8 @@
                 "enum": [
                     "English",
                     "Hindi",
+                    "Arabic",
+                    "French",
                     "Assamese",
                     "Bengali",
                     "Gujarati",

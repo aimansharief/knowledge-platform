@@ -1,27 +1,23 @@
 package org.sunbird.mangers
 
-import java.util
 import org.apache.commons.lang3.StringUtils
-import org.sunbird.cache.impl.RedisCache
-import org.sunbird.common.{JsonUtils, Platform}
 import org.sunbird.common.dto.{Request, Response, ResponseHandler}
 import org.sunbird.common.exception.{ClientException, ServerException}
+import org.sunbird.common.{JsonUtils, Platform}
 import org.sunbird.graph.OntologyEngineContext
 import org.sunbird.graph.dac.model.{Relation, SubGraph}
 import org.sunbird.graph.nodes.DataNode
-
 import org.sunbird.graph.schema.{DefinitionNode, ObjectCategoryDefinition}
 import org.sunbird.graph.utils.NodeUtil
 import org.sunbird.graph.utils.NodeUtil.{convertJsonProperties, handleKeyNames}
+import org.sunbird.utils.Constants
 
 import java.util
-import java.util.{Collections, Optional}
-import java.util.concurrent.{CompletionException, Executors}
-import scala.collection.JavaConverters
-import scala.collection.JavaConverters._
+import java.util.Optional
+import java.util.concurrent.CompletionException
 import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
-import org.sunbird.utils.Constants
 
 object FrameworkManager {
   val schemaVersion: String = "1.0"
@@ -84,7 +80,6 @@ object FrameworkManager {
     val updatedMetadata: util.Map[String, AnyRef] = metadata.entrySet().asScala.filter(entry => null != entry.getValue)
       .map((entry: util.Map.Entry[String, AnyRef]) => handleKeyNames(entry, null) -> convertJsonProperties(entry, jsonProps)).toMap ++
       Map("objectType" -> node.getObjectType, "identifier" -> node.getIdentifier, "languageCode" -> NodeUtil.getLanguageCodes(node))
-
     val fields =DefinitionNode.getMetadataFields(node.getGraphId, schemaVersion, objectType, definition)
     val filteredData: util.Map[String, AnyRef] = if(fields.nonEmpty) updatedMetadata.filterKeys(key => fields.contains(key)) else updatedMetadata
 
@@ -255,5 +250,31 @@ object FrameworkManager {
     req
   }
 
+  def reviewFramework(frameworkId: String, request: Request, frameworkHierarchy: util.Map[String, AnyRef])(implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Response] = {
+    if (frameworkHierarchy != null && frameworkHierarchy.nonEmpty) {
+      val fwObjectType = frameworkHierarchy.getOrDefault("objectType", "").asInstanceOf[String]
+      if (null != frameworkHierarchy && StringUtils.isNotBlank(fwObjectType))
+        request.getContext.put(Constants.SCHEMA_NAME, fwObjectType)
 
+      if (StringUtils.equalsAnyIgnoreCase(Constants.PROCESSING, frameworkHierarchy.getOrDefault(Constants.STATUS, "").asInstanceOf[String]))
+        throw new ClientException("ERR_NODE_ACCESS_DENIED", "Review Operation Can't Be Applied On Node Under Processing State")
+
+      val categories = frameworkHierarchy.getOrDefault("categories", new util.ArrayList[util.Map[String, AnyRef]]()).asInstanceOf[util.List[util.Map[String, AnyRef]]]
+      if (categories.isEmpty) {
+        throw new ClientException("ERR_INVALID_FRAMEWORK", "No categories present in the framework, cannot proceed to review")
+      }
+      categories.foreach { category =>
+        val terms = category.getOrDefault("terms", new util.ArrayList[util.Map[String, AnyRef]]()).asInstanceOf[util.List[util.Map[String, AnyRef]]]
+        if (terms.isEmpty) {
+          val categoryName = category.getOrDefault("name", "").asInstanceOf[String]
+          throw new ClientException("ERR_INVALID_CATEGORY", s"Category '$categoryName' must contain at least one term")
+        }
+      }
+      request.getRequest.put(Constants.STATUS, "Review")
+      DataNode.update(request).map(node => {
+        ResponseHandler.OK.put("identifier", node.getIdentifier).put("versionKey", node.getMetadata.get("versionKey"))
+      })
+    }
+    else throw new ClientException("ERR_FRAMEWORK_NOT_FOUND", s"Framework Doesn't Exist with Identifier: $frameworkId")
+  }
 }

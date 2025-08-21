@@ -5,6 +5,8 @@ object Constants {
     val READ_OBJECT_CATEGORY: String = "readObjectCategory"
     val UPDATE_OBJECT_CATEGORY: String = "updateObjectCategory"
     val IDENTIFIER: String = "identifier"
+    val STATUS: String = "status"
+    val PROCESSING: String = "processing"
     val NAME: String = "name"
     val NODE_ID: String = "node_id"
     val CATEGORY_PREFIX: String = "obj-cat:"
@@ -33,12 +35,15 @@ object Constants {
     val RETIRE_FRAMEWORK: String = "retireFramework";
     val COPY_FRAMEWORK: String = "copyFramework";
     val PUBLISH_FRAMEWORK: String = "publishFramework";
+    val REVIEW_FRAMEWORK: String = "reviewFramework"
+    val REJECT_FRAMEWORK: String = "rejectFramework"
     val FRAMEWORK_SCHEMA_VERSION = "1.0";
     val FRAMEWORK_SCHEMA_NAME="framework"
     val CATEGORIES: String = "categories"
     val CHANNEL_SCHEMA_NAME="channel"
     val CHANNEL_SCHEMA_VERSION = "1.0";
     val PUBLISH_STATUS: String = "publishStatus"
+    val MODE: String = "mode"
 
     val CATEGORY: String = "category";
     val CREATE_CATEGORY: String = "createCategory";

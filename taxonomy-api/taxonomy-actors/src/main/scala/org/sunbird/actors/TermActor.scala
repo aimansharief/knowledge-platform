@@ -2,10 +2,11 @@ package org.sunbird.actors
 
 import org.apache.commons.lang3.StringUtils
 import org.sunbird.actor.core.BaseActor
-import org.sunbird.common.{Platform, Slug}
 import org.sunbird.common.dto.{Request, Response, ResponseHandler}
-import org.sunbird.common.exception.{ClientException, ResponseCode }
+import org.sunbird.common.exception.{ClientException, ResponseCode}
+import org.sunbird.common.{Platform, Slug}
 import org.sunbird.graph.OntologyEngineContext
+import org.sunbird.graph.common.Identifier
 import org.sunbird.graph.dac.enums.RelationTypes
 import org.sunbird.graph.dac.model.Node
 import org.sunbird.graph.nodes.DataNode
@@ -54,7 +55,8 @@ class TermActor @Inject()(implicit oec: OntologyEngineContext) extends BaseActor
           i = (i + 1)
           categoryList.add(relationMap)
           request.put("categories", categoryList)
-          request.getRequest.put(Constants.IDENTIFIER, generateIdentifier(categoryId, req.getOrDefault(Constants.CODE, "").asInstanceOf[String]))
+          val termId = generateIdentifier(categoryId, req.getOrDefault(Constants.CODE, "").asInstanceOf[String]) + Identifier.getUniqueIdFromTimestamp
+          request.getRequest.put(Constants.IDENTIFIER, termId)
           request.getRequest.putAll(req)
           DataNode.create(request).map(termNode =>
             identifier.add(termNode.getIdentifier)
