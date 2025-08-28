@@ -20,6 +20,14 @@ object PublishManager {
 	private val kfClient = new KafkaClient
 
 	def publish(request: Request, node: Node)(implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Response] = {
+		publishWithAction(request, node, ContentConstants.PUBLISH)
+	}
+
+	def refreshBody(request: Request, node: Node)(implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Response] = {
+		publishWithAction(request, node, ContentConstants.REFRESH_BODY)
+	}
+
+	private def publishWithAction(request: Request, node: Node, action: String)(implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Response] = {
 		val identifier: String = node.getIdentifier
 		val mimeType = node.getMetadata.getOrDefault(ContentConstants.MIME_TYPE, "").asInstanceOf[String]
 		val mgr = MimeTypeManagerFactory.getManager(node.getObjectType, mimeType)
@@ -33,13 +41,17 @@ object PublishManager {
 		val publishFuture: Future[scala.collection.Map[String, AnyRef]] = mgr.publish(identifier, node)
 		publishFuture.map(result => {
 			// Push Instruction Event - Learning code has logic to send publish instruction to different topics based on mimeTypes. That logic is not implemented here due to deprecation of samza jobs.
-			pushInstructionEvent(identifier, node)
+			pushInstructionEventWithAction(identifier, node, action)
 
 			val response = new Response
 			val param = new ResponseParams
 			param.setStatus(StatusType.successful.name)
 			response.setParams(param)
-			response.put(ContentConstants.PUBLISH_STATUS, s"Publish Event for Content Id '${node.getIdentifier}' is pushed Successfully!")
+			if (action == ContentConstants.REFRESH_BODY) {
+				response.put(ContentConstants.PUBLISH_STATUS, s"Refresh Body Event for Content Id '${node.getIdentifier}' is pushed Successfully!")
+			} else {
+				response.put(ContentConstants.PUBLISH_STATUS, s"Publish Event for Content Id '${node.getIdentifier}' is pushed Successfully!")
+			}
 			response.put(ContentConstants.NODE_ID, node.getIdentifier)
 
 			Future(response)
@@ -48,11 +60,16 @@ object PublishManager {
 
 	@throws[Exception]
 	private def pushInstructionEvent(identifier: String, node: Node): Unit = {
+		pushInstructionEventWithAction(identifier, node, ContentConstants.PUBLISH)
+	}
+
+	@throws[Exception]
+	private def pushInstructionEventWithAction(identifier: String, node: Node, action: String): Unit = {
 		val actor: util.Map[String, AnyRef] = new util.HashMap[String, AnyRef]
 		val context: util.Map[String, AnyRef] = new util.HashMap[String, AnyRef]
 		val objectData: util.Map[String, AnyRef] = new util.HashMap[String, AnyRef]
 		val edata: util.Map[String, AnyRef] = new util.HashMap[String, AnyRef]
-		generateInstructionEventMetadata(actor, context, objectData, edata, node, identifier)
+		generateInstructionEventMetadata(actor, context, objectData, edata, node, identifier, action)
 		val beJobRequestEvent: String = LogTelemetryEventUtil.logInstructionEvent(actor, context, objectData, edata)
 		val topic: String = Platform.getString(ContentConstants.KAFKA_PUBLISH_TOPIC,"sunbirddev.publish.job.request")
 		if (StringUtils.isBlank(beJobRequestEvent)) throw new ClientException("BE_JOB_REQUEST_EXCEPTION", "Event is not generated properly.")
@@ -60,6 +77,10 @@ object PublishManager {
 	}
 
 	private def generateInstructionEventMetadata(actor: util.Map[String, AnyRef], context: util.Map[String, AnyRef], objectData: util.Map[String, AnyRef], edata: util.Map[String, AnyRef], node: Node, identifier: String): Unit = {
+		generateInstructionEventMetadata(actor, context, objectData, edata, node, identifier, ContentConstants.PUBLISH)
+	}
+
+	private def generateInstructionEventMetadata(actor: util.Map[String, AnyRef], context: util.Map[String, AnyRef], objectData: util.Map[String, AnyRef], edata: util.Map[String, AnyRef], node: Node, identifier: String, action: String): Unit = {
 		val metadata: util.Map[String, AnyRef] = node.getMetadata
 
 		// actor
@@ -82,10 +103,14 @@ object PublishManager {
 		objectData.put(ContentConstants.VER, metadata.get(ContentConstants.VERSION_KEY))
 
 		//edata
-		getEData(metadata, edata, identifier, node.getObjectType)
+		getEData(metadata, edata, identifier, node.getObjectType, action)
 	}
 
 	private def getEData(metadata: util.Map[String, AnyRef], edata:  util.Map[String, AnyRef], identifier: String, objectType: String): Unit = {
+		getEData(metadata, edata, identifier, objectType, ContentConstants.PUBLISH)
+	}
+
+	private def getEData(metadata: util.Map[String, AnyRef], edata:  util.Map[String, AnyRef], identifier: String, objectType: String, action: String): Unit = {
 		val instructionEventMetadata = new util.HashMap[String, AnyRef]
 		edata.put(ContentConstants.PUBLISH_TYPE, metadata.get(ContentConstants.PUBLISH_TYPE))
 		instructionEventMetadata.put(ContentConstants.PACKAGE_VERSION, metadata.getOrDefault(ContentConstants.PACKAGE_VERSION,0.asInstanceOf[AnyRef]))
@@ -94,7 +119,7 @@ object PublishManager {
 		instructionEventMetadata.put(ContentConstants.IDENTIFIER, identifier.replace(".img",""))
 		instructionEventMetadata.put(ContentConstants.OBJECT_TYPE, objectType)
 		edata.put(ContentConstants.METADATA, instructionEventMetadata)
-		edata.put(ContentConstants.ACTION, ContentConstants.PUBLISH)
+		edata.put(ContentConstants.ACTION, action)
 		edata.put(ContentConstants.CONTENT_TYPE, metadata.get(ContentConstants.CONTENT_TYPE))
 	}
 }

@@ -92,6 +92,12 @@ class ContentSpec extends BaseSpec {
             isOK(result)
             status(result) must equalTo(OK)
         }
+        "return success response for refreshBody API" in {
+            val controller = app.injector.instanceOf[controllers.v3.ContentController]
+            val result = controller.refreshBody("0123")(FakeRequest())
+            isOK(result)
+            status(result) must equalTo(OK)
+        }
         "return success response for review API" in {
             val controller = app.injector.instanceOf[controllers.v3.ContentController]
             val result = controller.review("0123")(FakeRequest())
