@@ -38,24 +38,36 @@ object PublishManager {
 		val publishType = request.getContext.getOrDefault(ContentConstants.PUBLISH_TYPE, "").asInstanceOf[String]
 		node.getMetadata.put(ContentConstants.PUBLISH_TYPE, publishType)
 
-		val publishFuture: Future[scala.collection.Map[String, AnyRef]] = mgr.publish(identifier, node)
-		publishFuture.map(result => {
-			// Push Instruction Event - Learning code has logic to send publish instruction to different topics based on mimeTypes. That logic is not implemented here due to deprecation of samza jobs.
-			pushInstructionEventWithAction(identifier, node, action)
-
+		val status = node.getMetadata.getOrDefault(ContentConstants.STATUS, "").asInstanceOf[String]
+		if (action == ContentConstants.REFRESH_BODY && (StringUtils.equalsIgnoreCase(status, "Draft") || StringUtils.equalsIgnoreCase(status, "Review"))) {
+			// Skip publish and push for Draft or Review status in refreshBody
 			val response = new Response
 			val param = new ResponseParams
 			param.setStatus(StatusType.successful.name)
 			response.setParams(param)
-			if (action == ContentConstants.REFRESH_BODY) {
-				response.put(ContentConstants.PUBLISH_STATUS, s"Refresh Body Event for Content Id '${node.getIdentifier}' is pushed Successfully!")
-			} else {
-				response.put(ContentConstants.PUBLISH_STATUS, s"Publish Event for Content Id '${node.getIdentifier}' is pushed Successfully!")
-			}
+			response.put(ContentConstants.PUBLISH_STATUS, s"Refresh Body Event for Content Id '${node.getIdentifier}' is pushed Successfully!")
 			response.put(ContentConstants.NODE_ID, node.getIdentifier)
-
 			Future(response)
-		}).flatMap(f => f)
+		} else {
+			val publishFuture: Future[scala.collection.Map[String, AnyRef]] = mgr.publish(identifier, node)
+			publishFuture.map(result => {
+				// Push Instruction Event - Learning code has logic to send publish instruction to different topics based on mimeTypes. That logic is not implemented here due to deprecation of samza jobs.
+				pushInstructionEventWithAction(identifier, node, action)
+
+				val response = new Response
+				val param = new ResponseParams
+				param.setStatus(StatusType.successful.name)
+				response.setParams(param)
+				if (action == ContentConstants.REFRESH_BODY) {
+					response.put(ContentConstants.PUBLISH_STATUS, s"Refresh Body Event for Content Id '${node.getIdentifier}' is pushed Successfully!")
+				} else {
+					response.put(ContentConstants.PUBLISH_STATUS, s"Publish Event for Content Id '${node.getIdentifier}' is pushed Successfully!")
+				}
+				response.put(ContentConstants.NODE_ID, node.getIdentifier)
+
+				Future(response)
+			}).flatMap(f => f)
+		}
 	}
 
 	@throws[Exception]
