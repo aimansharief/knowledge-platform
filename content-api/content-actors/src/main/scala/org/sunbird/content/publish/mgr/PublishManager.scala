@@ -47,6 +47,7 @@ object PublishManager {
 			response.setParams(param)
 			response.put(ContentConstants.PUBLISH_STATUS, s"Refresh Body Event for Content Id '${node.getIdentifier}' is pushed Successfully!")
 			response.put(ContentConstants.NODE_ID, node.getIdentifier)
+			pushInstructionEventWithAction(identifier, node, action)
 			Future(response)
 		} else {
 			val publishFuture: Future[scala.collection.Map[String, AnyRef]] = mgr.publish(identifier, node)
