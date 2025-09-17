@@ -74,7 +74,7 @@ object CompetencyFrameworkValidator {
 
     // Validate signupBy
     val signupBy = nodeData.getOrDefault("signupBy", "").asInstanceOf[String]
-    if (!StringUtils.equalsAnyIgnoreCase(signupBy, "Admin", "User")) {
+    if (StringUtils.isNotEmpty(signupBy) && !StringUtils.equalsAnyIgnoreCase(signupBy, "Admin", "User")) {
       throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework signupBy must be 'Admin' or 'User'")
     }
 
@@ -89,7 +89,7 @@ object CompetencyFrameworkValidator {
     val certificate = nodeData.get("certificate").asInstanceOf[util.Map[String, AnyRef]]
     if (certificate != null) {
       val certificateEnabled = certificate.getOrDefault("enabled", "").asInstanceOf[String]
-      if (!StringUtils.equalsAnyIgnoreCase(certificateEnabled, "Yes", "No")) {
+      if (StringUtils.isNotEmpty(certificateEnabled) && !StringUtils.equalsAnyIgnoreCase(certificateEnabled, "Yes", "No")) {
         throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework certificate enabled must be 'Yes' or 'No'")
       }
     }
@@ -112,7 +112,7 @@ object CompetencyFrameworkValidator {
     val timeLimit = nodeData.get("timeLimit").asInstanceOf[util.Map[String, AnyRef]]
     if (timeLimit != null) {
       val timeLimitEnabled = timeLimit.getOrDefault("enabled", "").asInstanceOf[String]
-      if (!StringUtils.equalsAnyIgnoreCase(timeLimitEnabled, "Yes", "No")) {
+      if (StringUtils.isNotEmpty(timeLimitEnabled) && !StringUtils.equalsAnyIgnoreCase(timeLimitEnabled, "Yes", "No")) {
         throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level timeLimit enabled must be 'Yes' or 'No'")
       }
       
@@ -137,7 +137,7 @@ object CompetencyFrameworkValidator {
             throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level timeLimit duration value must be at least 1")
           }
           
-          if (!StringUtils.equalsAnyIgnoreCase(durationUnit, "Days", "Months", "Years")) {
+          if (StringUtils.isNotEmpty(durationUnit) && !StringUtils.equalsAnyIgnoreCase(durationUnit, "Days", "Months", "Years")) {
             throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level timeLimit duration unit must be 'Days', 'Months', or 'Years'")
           }
         }
@@ -148,7 +148,7 @@ object CompetencyFrameworkValidator {
     val entranceExam = nodeData.get("entranceExam").asInstanceOf[util.Map[String, AnyRef]]
     if (entranceExam != null) {
       val entranceExamEnabled = entranceExam.getOrDefault("enabled", "").asInstanceOf[String]
-      if (!StringUtils.equalsAnyIgnoreCase(entranceExamEnabled, "Yes", "No")) {
+      if (StringUtils.isNotEmpty(entranceExamEnabled) && !StringUtils.equalsAnyIgnoreCase(entranceExamEnabled, "Yes", "No")) {
         throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level entranceExam enabled must be 'Yes' or 'No'")
       }
       
@@ -170,7 +170,7 @@ object CompetencyFrameworkValidator {
           throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level levelExam passingCriteria is required when collectionId is provided")
         } else {
           val mustPass = passingCriteria.getOrDefault("mustPass", "").asInstanceOf[String]
-          if (!StringUtils.equalsAnyIgnoreCase(mustPass, "Yes", "No")) {
+          if (StringUtils.isNotEmpty(mustPass) && !StringUtils.equalsAnyIgnoreCase(mustPass, "Yes", "No")) {
             throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level levelExam passingCriteria mustPass must be 'Yes' or 'No'")
           }
         }
@@ -181,7 +181,7 @@ object CompetencyFrameworkValidator {
     val certificate = nodeData.get("certificate").asInstanceOf[util.Map[String, AnyRef]]
     if (certificate != null) {
       val certificateEnabled = certificate.getOrDefault("enabled", "").asInstanceOf[String]
-      if (!StringUtils.equalsAnyIgnoreCase(certificateEnabled, "Yes", "No")) {
+      if (StringUtils.isNotEmpty(certificateEnabled) && !StringUtils.equalsAnyIgnoreCase(certificateEnabled, "Yes", "No")) {
         throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level certificate enabled must be 'Yes' or 'No'")
       }
     }
