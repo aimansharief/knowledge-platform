@@ -5,7 +5,7 @@ import org.sunbird.common.Platform
 import org.sunbird.common.dto.ResponseParams.StatusType
 import org.sunbird.common.dto.{Request, Response, ResponseParams}
 import org.sunbird.common.exception.ClientException
-import org.sunbird.content.util.ContentConstants
+import org.sunbird.content.util.{CompetencyFrameworkValidator, ContentConstants}
 import org.sunbird.graph.OntologyEngineContext
 import org.sunbird.graph.dac.model.Node
 import org.sunbird.kafka.client.KafkaClient
@@ -22,28 +22,32 @@ object PublishManager {
 	def publish(request: Request, node: Node)(implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Response] = {
 		val identifier: String = node.getIdentifier
 		val mimeType = node.getMetadata.getOrDefault(ContentConstants.MIME_TYPE, "").asInstanceOf[String]
-		val mgr = MimeTypeManagerFactory.getManager(node.getObjectType, mimeType)
+		
+		// Validate Competency Framework if applicable
+		CompetencyFrameworkValidator.validateCompetencyFramework(request, node).flatMap { _ =>
+			val mgr = MimeTypeManagerFactory.getManager(node.getObjectType, mimeType)
 
-		val publishCheckList = request.getContext.getOrDefault(ContentConstants.PUBLIC_CHECK_LIST, List.empty[String]).asInstanceOf[List[String]]
-		if (publishCheckList.isEmpty) node.getMetadata.put(ContentConstants.PUBLIC_CHECK_LIST, null)
+			val publishCheckList = request.getContext.getOrDefault(ContentConstants.PUBLIC_CHECK_LIST, List.empty[String]).asInstanceOf[List[String]]
+			if (publishCheckList.isEmpty) node.getMetadata.put(ContentConstants.PUBLIC_CHECK_LIST, null)
 
-		val publishType = request.getContext.getOrDefault(ContentConstants.PUBLISH_TYPE, "").asInstanceOf[String]
-		node.getMetadata.put(ContentConstants.PUBLISH_TYPE, publishType)
+			val publishType = request.getContext.getOrDefault(ContentConstants.PUBLISH_TYPE, "").asInstanceOf[String]
+			node.getMetadata.put(ContentConstants.PUBLISH_TYPE, publishType)
 
-		val publishFuture: Future[scala.collection.Map[String, AnyRef]] = mgr.publish(identifier, node)
-		publishFuture.map(result => {
-			// Push Instruction Event - Learning code has logic to send publish instruction to different topics based on mimeTypes. That logic is not implemented here due to deprecation of samza jobs.
-			pushInstructionEvent(identifier, node)
+			val publishFuture: Future[scala.collection.Map[String, AnyRef]] = mgr.publish(identifier, node)
+			publishFuture.map(result => {
+				// Push Instruction Event - Learning code has logic to send publish instruction to different topics based on mimeTypes. That logic is not implemented here due to deprecation of samza jobs.
+				pushInstructionEvent(identifier, node)
 
-			val response = new Response
-			val param = new ResponseParams
-			param.setStatus(StatusType.successful.name)
-			response.setParams(param)
-			response.put(ContentConstants.PUBLISH_STATUS, s"Publish Event for Content Id '${node.getIdentifier}' is pushed Successfully!")
-			response.put(ContentConstants.NODE_ID, node.getIdentifier)
+				val response = new Response
+				val param = new ResponseParams
+				param.setStatus(StatusType.successful.name)
+				response.setParams(param)
+				response.put(ContentConstants.PUBLISH_STATUS, s"Publish Event for Content Id '${node.getIdentifier}' is pushed Successfully!")
+				response.put(ContentConstants.NODE_ID, node.getIdentifier)
 
-			Future(response)
-		}).flatMap(f => f)
+				Future(response)
+			}).flatMap(f => f)
+		}
 	}
 
 	@throws[Exception]
