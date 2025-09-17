@@ -187,7 +187,7 @@ class TestCompetencyFrameworkValidator extends AsyncFlatSpec with Matchers with 
     }
   }
 
-  it should "throw validation error for Entrance Exam Based enrollmentType without valid entranceExam" in {
+  it should "throw validation error for Entrance Exam Based enrollmentType without valid entranceExam for all levels" in {
     implicit val oec: OntologyEngineContext = mock[OntologyEngineContext]
     val request = new Request()
     val node = new Node()
@@ -204,7 +204,7 @@ class TestCompetencyFrameworkValidator extends AsyncFlatSpec with Matchers with 
         "name" -> "Level 1", 
         "visibility" -> "Parent",
         "entranceExam" -> Map(
-          "enabled" -> "No" // Should be "Yes" with collectionId for Entrance Exam Based
+          "enabled" -> "No" // Should be "Yes" with collectionId for ALL Competency Levels when Entrance Exam Based
         ).asJava,
         "children" -> new util.ArrayList[util.Map[String, AnyRef]]()
       ).asJava)
@@ -214,9 +214,54 @@ class TestCompetencyFrameworkValidator extends AsyncFlatSpec with Matchers with 
     
     CompetencyFrameworkValidator.validateCompetencyFramework(request, node).recover {
       case ex: ClientException =>
-        ex.getMessage should include("enrollmentType 'Entrance Exam Based' must have at least one Competency Level with entranceExam enabled")
+        ex.getMessage should include("requires all Competency Levels to have entranceExam enabled")
         succeed
       case _ => fail("Expected ClientException for invalid Entrance Exam Based setup")
+    }
+  }
+
+  it should "throw validation error when one Competency Level lacks entranceExam in Entrance Exam Based framework" in {
+    implicit val oec: OntologyEngineContext = mock[OntologyEngineContext]
+    val request = new Request()
+    val node = new Node()
+    node.setIdentifier("do_123")
+    node.setMetadata(Map("primaryCategory" -> "Competency Framework").asJava)
+    
+    val hierarchyResponse = ResponseHandler.OK()
+    val hierarchyWithMixedEntranceExam = Map(
+      "primaryCategory" -> "Competency Framework",
+      "visibility" -> "Private",
+      "enrollmentType" -> "Entrance Exam Based",
+      "children" -> util.Arrays.asList(
+        Map(
+          "primaryCategory" -> "Competency Level",
+          "name" -> "Level 1", 
+          "visibility" -> "Parent",
+          "entranceExam" -> Map(
+            "enabled" -> "Yes",
+            "collectionId" -> "collection123"
+          ).asJava,
+          "children" -> new util.ArrayList[util.Map[String, AnyRef]]()
+        ).asJava,
+        Map(
+          "primaryCategory" -> "Competency Level",
+          "name" -> "Level 2", 
+          "visibility" -> "Parent",
+          "entranceExam" -> Map(
+            "enabled" -> "No" // This should fail validation
+          ).asJava,
+          "children" -> new util.ArrayList[util.Map[String, AnyRef]]()
+        ).asJava
+      )
+    ).asJava
+    
+    hierarchyResponse.put("content", hierarchyWithMixedEntranceExam)
+    
+    CompetencyFrameworkValidator.validateCompetencyFramework(request, node).recover {
+      case ex: ClientException =>
+        ex.getMessage should include("requires all Competency Levels to have entranceExam enabled")
+        succeed
+      case _ => fail("Expected ClientException for mixed entranceExam setup")
     }
   }
 

@@ -202,26 +202,28 @@ object CompetencyFrameworkValidator {
   }
 
   private def validateEntranceExamRequiredForFramework(nodeData: util.Map[String, AnyRef]): Unit = {
-    // For enrollmentType "Entrance Exam Based", check if any child has entranceExam enabled with collectionId
+    // For enrollmentType "Entrance Exam Based", check that all Competency Level children have entranceExam enabled with collectionId
     val children = nodeData.getOrDefault("children", new util.ArrayList[util.Map[String, AnyRef]]()).asInstanceOf[util.List[util.Map[String, AnyRef]]]
-    var hasValidEntranceExam = false
-    
-    children.asScala.foreach(child => {
+    val competencyLevels = children.asScala.filter(child => {
       val childPrimaryCategory = child.getOrDefault("primaryCategory", "").asInstanceOf[String]
-      if (StringUtils.equalsIgnoreCase("Competency Level", childPrimaryCategory)) {
-        val entranceExam = child.get("entranceExam").asInstanceOf[util.Map[String, AnyRef]]
-        if (entranceExam != null) {
-          val entranceExamEnabled = entranceExam.getOrDefault("enabled", "").asInstanceOf[String]
-          val collectionId = entranceExam.getOrDefault("collectionId", "").asInstanceOf[String]
-          if (StringUtils.equalsIgnoreCase("Yes", entranceExamEnabled) && StringUtils.isNotEmpty(collectionId)) {
-            hasValidEntranceExam = true
-          }
+      StringUtils.equalsIgnoreCase("Competency Level", childPrimaryCategory)
+    })
+    
+    if (competencyLevels.isEmpty) {
+      throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework with enrollmentType 'Entrance Exam Based' must have at least one Competency Level")
+    }
+    
+    competencyLevels.foreach(child => {
+      val entranceExam = child.get("entranceExam").asInstanceOf[util.Map[String, AnyRef]]
+      if (entranceExam == null) {
+        throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework with enrollmentType 'Entrance Exam Based' requires all Competency Levels to have entranceExam enabled with collectionId provided")
+      } else {
+        val entranceExamEnabled = entranceExam.getOrDefault("enabled", "").asInstanceOf[String]
+        val collectionId = entranceExam.getOrDefault("collectionId", "").asInstanceOf[String]
+        if (!StringUtils.equalsIgnoreCase("Yes", entranceExamEnabled) || StringUtils.isEmpty(collectionId)) {
+          throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework with enrollmentType 'Entrance Exam Based' requires all Competency Levels to have entranceExam enabled with collectionId provided")
         }
       }
     })
-    
-    if (!hasValidEntranceExam) {
-      throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework with enrollmentType 'Entrance Exam Based' must have at least one Competency Level with entranceExam enabled and collectionId provided")
-    }
   }
 }
