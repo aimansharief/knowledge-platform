@@ -153,4 +153,105 @@ class TestCompetencyFrameworkValidator extends AsyncFlatSpec with Matchers with 
       case _ => fail("Expected ClientException for invalid duration value")
     }
   }
+
+  it should "throw validation error when timeLimit is enabled but duration is missing" in {
+    implicit val oec: OntologyEngineContext = mock[OntologyEngineContext]
+    val request = new Request()
+    val node = new Node()
+    node.setIdentifier("do_123")
+    node.setMetadata(Map("primaryCategory" -> "Competency Framework").asJava)
+    
+    val hierarchyResponse = ResponseHandler.OK()
+    val hierarchyWithInvalidTimeLimit = Map(
+      "primaryCategory" -> "Competency Framework",
+      "visibility" -> "Private",
+      "children" -> util.Arrays.asList(Map(
+        "primaryCategory" -> "Competency Level",
+        "name" -> "Level 1",
+        "visibility" -> "Parent",
+        "timeLimit" -> Map(
+          "enabled" -> "Yes"
+          // Missing duration - this should fail validation
+        ).asJava,
+        "children" -> new util.ArrayList[util.Map[String, AnyRef]]()
+      ).asJava)
+    ).asJava
+    
+    hierarchyResponse.put("content", hierarchyWithInvalidTimeLimit)
+    
+    CompetencyFrameworkValidator.validateCompetencyFramework(request, node).recover {
+      case ex: ClientException =>
+        ex.getMessage should include("timeLimit duration is required when enabled")
+        succeed
+      case _ => fail("Expected ClientException for missing duration")
+    }
+  }
+
+  it should "throw validation error for Entrance Exam Based enrollmentType without valid entranceExam" in {
+    implicit val oec: OntologyEngineContext = mock[OntologyEngineContext]
+    val request = new Request()
+    val node = new Node()
+    node.setIdentifier("do_123")
+    node.setMetadata(Map("primaryCategory" -> "Competency Framework").asJava)
+    
+    val hierarchyResponse = ResponseHandler.OK()
+    val hierarchyWithInvalidEnrollmentType = Map(
+      "primaryCategory" -> "Competency Framework",
+      "visibility" -> "Private",
+      "enrollmentType" -> "Entrance Exam Based",
+      "children" -> util.Arrays.asList(Map(
+        "primaryCategory" -> "Competency Level",
+        "name" -> "Level 1", 
+        "visibility" -> "Parent",
+        "entranceExam" -> Map(
+          "enabled" -> "No" // Should be "Yes" with collectionId for Entrance Exam Based
+        ).asJava,
+        "children" -> new util.ArrayList[util.Map[String, AnyRef]]()
+      ).asJava)
+    ).asJava
+    
+    hierarchyResponse.put("content", hierarchyWithInvalidEnrollmentType)
+    
+    CompetencyFrameworkValidator.validateCompetencyFramework(request, node).recover {
+      case ex: ClientException =>
+        ex.getMessage should include("enrollmentType 'Entrance Exam Based' must have at least one Competency Level with entranceExam enabled")
+        succeed
+      case _ => fail("Expected ClientException for invalid Entrance Exam Based setup")
+    }
+  }
+
+  it should "throw validation error when levelExam has passingCriteria but no collectionId" in {
+    implicit val oec: OntologyEngineContext = mock[OntologyEngineContext]
+    val request = new Request()
+    val node = new Node()
+    node.setIdentifier("do_123")
+    node.setMetadata(Map("primaryCategory" -> "Competency Framework").asJava)
+    
+    val hierarchyResponse = ResponseHandler.OK()
+    val hierarchyWithInvalidLevelExam = Map(
+      "primaryCategory" -> "Competency Framework",
+      "visibility" -> "Private",
+      "children" -> util.Arrays.asList(Map(
+        "primaryCategory" -> "Competency Level",
+        "name" -> "Level 1",
+        "visibility" -> "Parent",
+        "levelExam" -> Map(
+          "passingCriteria" -> Map(
+            "mustPass" -> "Yes"
+          ).asJava
+          // Missing collectionId - this should fail validation
+        ).asJava,
+        "children" -> new util.ArrayList[util.Map[String, AnyRef]]()
+      ).asJava)
+    ).asJava
+    
+    hierarchyResponse.put("content", hierarchyWithInvalidLevelExam)
+    
+    CompetencyFrameworkValidator.validateCompetencyFramework(request, node).recover {
+      case ex: ClientException =>
+        ex.getMessage should include("levelExam collectionId is required when passingCriteria is provided")
+        succeed
+      case _ => fail("Expected ClientException for missing collectionId when passingCriteria is provided")
+    }
+  }
 }
