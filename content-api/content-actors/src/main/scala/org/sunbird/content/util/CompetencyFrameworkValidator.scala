@@ -166,7 +166,11 @@ object CompetencyFrameworkValidator {
             throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level timeLimit duration value must be at least 1")
           }
           
-          if (StringUtils.isNotEmpty(durationUnit) && !StringUtils.equalsAnyIgnoreCase(durationUnit, "Days", "Months", "Years")) {
+          if (StringUtils.isEmpty(durationUnit)) {
+            throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level timeLimit duration unit is required when enabled")
+          }
+          
+          if (!StringUtils.equalsAnyIgnoreCase(durationUnit, "Days", "Months", "Years")) {
             throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level timeLimit duration unit must be 'Days', 'Months', or 'Years'")
           }
         }
@@ -225,9 +229,12 @@ object CompetencyFrameworkValidator {
         validationFutures += levelExamValidation
       }
       
-      // If passingCriteria is provided, collectionId must be provided
-      if (passingCriteria != null && StringUtils.isEmpty(levelExamCollectionId)) {
-        throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level levelExam collectionId is required when passingCriteria is provided")
+      // If passingCriteria.mustPass is "Yes", collectionId must be provided
+      if (passingCriteria != null) {
+        val mustPass = passingCriteria.getOrDefault("mustPass", "").asInstanceOf[String]
+        if (StringUtils.equalsIgnoreCase("Yes", mustPass) && StringUtils.isEmpty(levelExamCollectionId)) {
+          throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level levelExam collectionId is required when passingCriteria mustPass is Yes")
+        }
       }
     }
 
@@ -284,7 +291,7 @@ object CompetencyFrameworkValidator {
     if (StringUtils.isBlank(collectionId)) {
       val msg = s"$fieldName collectionId is missing"
       errors += msg
-      Future.failed(new ClientException("ERR_BLANK_COLLECTION_ID", msg))
+      Future.successful(())
     } else {
       val request = new Request()
       Option(request.getContext).getOrElse {
@@ -314,7 +321,7 @@ object CompetencyFrameworkValidator {
         if (node == null) {
           val msg = s"$fieldName collectionId $collectionId not found"
           errors += msg
-          Future.failed(new ClientException("ERR_COLLECTION_NOT_FOUND", msg))
+          Future.successful(())
         } else {
           val metadata = node.getMetadata.asScala
           val status = metadata.getOrElse("status", "").toString
@@ -323,11 +330,11 @@ object CompetencyFrameworkValidator {
           if (!"Course".equalsIgnoreCase(contentType)) {
             val msg = s"$fieldName collectionId $collectionId has invalid contentType: $contentType (expected Course)"
             errors += msg
-            Future.failed(new ClientException("ERR_INVALID_CONTENT_TYPE", msg))
+            Future.successful(())
           } else if (!"Live".equalsIgnoreCase(status)) {
             val msg = s"$fieldName collectionId $collectionId has invalid status: $status (expected Live)"
             errors += msg
-            Future.failed(new ClientException("ERR_INVALID_STATUS", msg))
+            Future.successful(())
           } else {
             Future.unit
           }
