@@ -171,7 +171,11 @@ object CompetencyFrameworkValidator {
     val levelExam = nodeData.get("levelExam").asInstanceOf[util.Map[String, AnyRef]]
     if (levelExam != null) {
       val levelExamCollectionId = levelExam.getOrDefault("collectionId", "").asInstanceOf[String]
-      val passingCriteria = levelExam.get("passingCriteria").asInstanceOf[util.Map[String, AnyRef]]
+      val passingCriteria = levelExam.get("passingCriteria") match {
+        case map: util.Map[String, AnyRef] => map
+        case null => null
+        case _ => null // If passingCriteria exists but is not a Map, treat as null
+      }
       
       // If collectionId is provided, passingCriteria must be provided
       if (StringUtils.isNotEmpty(levelExamCollectionId)) {
