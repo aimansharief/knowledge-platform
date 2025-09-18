@@ -284,7 +284,7 @@ object CompetencyFrameworkValidator {
     if (StringUtils.isBlank(collectionId)) {
       val msg = s"$fieldName collectionId is missing"
       errors += msg
-      Future.failed(new ClientException("ERR_BLANK_COLLECTION_ID", msg))
+      Future.successful(())
     } else {
       val request = new Request()
       Option(request.getContext).getOrElse {
@@ -314,7 +314,7 @@ object CompetencyFrameworkValidator {
         if (node == null) {
           val msg = s"$fieldName collectionId $collectionId not found"
           errors += msg
-          Future.failed(new ClientException("ERR_COLLECTION_NOT_FOUND", msg))
+          Future.successful(())
         } else {
           val metadata = node.getMetadata.asScala
           val status = metadata.getOrElse("status", "").toString
@@ -323,11 +323,11 @@ object CompetencyFrameworkValidator {
           if (!"Course".equalsIgnoreCase(contentType)) {
             val msg = s"$fieldName collectionId $collectionId has invalid contentType: $contentType (expected Course)"
             errors += msg
-            Future.failed(new ClientException("ERR_INVALID_CONTENT_TYPE", msg))
+            Future.successful(())
           } else if (!"Live".equalsIgnoreCase(status)) {
             val msg = s"$fieldName collectionId $collectionId has invalid status: $status (expected Live)"
             errors += msg
-            Future.failed(new ClientException("ERR_INVALID_STATUS", msg))
+            Future.successful(())
           } else {
             Future.unit
           }
