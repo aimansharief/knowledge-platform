@@ -5,7 +5,7 @@ import org.sunbird.common.Platform
 import org.sunbird.common.dto.ResponseParams.StatusType
 import org.sunbird.common.dto.{Request, Response, ResponseParams}
 import org.sunbird.common.exception.ClientException
-import org.sunbird.content.util.ContentConstants
+import org.sunbird.content.util.{CompetencyFrameworkValidator, ContentConstants}
 import org.sunbird.graph.OntologyEngineContext
 import org.sunbird.graph.dac.model.Node
 import org.sunbird.kafka.client.KafkaClient
