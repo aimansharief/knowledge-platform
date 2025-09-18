@@ -61,12 +61,6 @@ object CompetencyFrameworkValidator {
 
   private def validateCompetencyFrameworkNode(nodeData: util.Map[String, AnyRef], errors: ListBuffer[String], parentNode: Node)
                                          (implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Unit] = {
-    // Validate visibility
-    val visibility = nodeData.getOrDefault("visibility", "").asInstanceOf[String]
-    if (!StringUtils.equalsIgnoreCase("Private", visibility)) {
-      throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework visibility must be 'Private'")
-    }
-
     // Validate sector
     val sector = nodeData.get("sector") match {
       case map: util.Map[String, AnyRef] => map
@@ -77,26 +71,25 @@ object CompetencyFrameworkValidator {
       val sectorName = sector.getOrDefault("name", "").asInstanceOf[String]
       val sectorDomain = sector.getOrDefault("domain", "").asInstanceOf[String]
       
-      if (!StringUtils.equalsIgnoreCase("Education", sectorName)) {
-        throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework sector name must be 'Education'")
+      if (StringUtils.isEmpty(sectorName)) {
+        throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework sector name is required")
       }
       
-      if (!StringUtils.equalsIgnoreCase("Preschool", sectorDomain)) {
-        throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework sector domain must be 'Preschool'")
+      if (StringUtils.isEmpty(sectorDomain)) {
+        throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework sector domain is required")
       }
     }
 
-    // Validate signupBy
+    // Validate signupBy - only check existence, no value comparison
     val signupBy = nodeData.getOrDefault("signupBy", "").asInstanceOf[String]
-    if (StringUtils.isNotEmpty(signupBy) && !StringUtils.equalsAnyIgnoreCase(signupBy, "Admin", "User")) {
-      throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework signupBy must be 'Admin' or 'User'")
+    if (StringUtils.isEmpty(signupBy)) {
+      throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework signupBy is required")
     }
 
-    // Validate enrollmentType
+    // Validate enrollmentType - only check existence, no value comparison
     val enrollmentType = nodeData.getOrDefault("enrollmentType", "").asInstanceOf[String]
-    if (StringUtils.isNotEmpty(enrollmentType) && 
-        !StringUtils.equalsAnyIgnoreCase(enrollmentType, "Full Enrollment", "Entrance Exam Based", "Progress Based")) {
-      throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework enrollmentType must be 'Full Enrollment', 'Entrance Exam Based', or 'Progress Based'")
+    if (StringUtils.isEmpty(enrollmentType)) {
+      throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework enrollmentType is required")
     }
 
     // Validate entranceExam requirement for "Entrance Exam Based" enrollmentType
@@ -129,12 +122,6 @@ object CompetencyFrameworkValidator {
     val name = nodeData.getOrDefault("name", "").asInstanceOf[String]
     if (StringUtils.isEmpty(name)) {
       throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level name is required")
-    }
-
-    // Validate visibility
-    val visibility = nodeData.getOrDefault("visibility", "").asInstanceOf[String]
-    if (!StringUtils.equalsIgnoreCase("Parent", visibility)) {
-      throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level visibility must be 'Parent'")
     }
 
     // Validate timeLimit
