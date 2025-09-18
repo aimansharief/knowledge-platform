@@ -58,7 +58,11 @@ object CompetencyFrameworkValidator {
     }
 
     // Validate sector
-    val sector = nodeData.get("sector").asInstanceOf[util.Map[String, AnyRef]]
+    val sector = nodeData.get("sector") match {
+      case map: util.Map[String, AnyRef] => map
+      case null => null
+      case _ => null // If sector exists but is not a Map, treat as null
+    }
     if (sector != null) {
       val sectorName = sector.getOrDefault("name", "").asInstanceOf[String]
       val sectorDomain = sector.getOrDefault("domain", "").asInstanceOf[String]
@@ -91,7 +95,11 @@ object CompetencyFrameworkValidator {
     }
 
     // Validate certificate
-    val certificate = nodeData.get("certificate").asInstanceOf[util.Map[String, AnyRef]]
+    val certificate = nodeData.get("certificate") match {
+      case map: util.Map[String, AnyRef] => map
+      case null => null
+      case _ => null // If certificate exists but is not a Map, treat as null
+    }
     if (certificate != null) {
       val certificateEnabled = certificate.getOrDefault("enabled", "").asInstanceOf[String]
       if (StringUtils.isNotEmpty(certificateEnabled) && !StringUtils.equalsAnyIgnoreCase(certificateEnabled, "Yes", "No")) {
@@ -114,7 +122,11 @@ object CompetencyFrameworkValidator {
     }
 
     // Validate timeLimit
-    val timeLimit = nodeData.get("timeLimit").asInstanceOf[util.Map[String, AnyRef]]
+    val timeLimit = nodeData.get("timeLimit") match {
+      case map: util.Map[String, AnyRef] => map
+      case null => null
+      case _ => null // If timeLimit exists but is not a Map, treat as null
+    }
     if (timeLimit != null) {
       val timeLimitEnabled = timeLimit.getOrDefault("enabled", "").asInstanceOf[String]
       if (StringUtils.isNotEmpty(timeLimitEnabled) && !StringUtils.equalsAnyIgnoreCase(timeLimitEnabled, "Yes", "No")) {
@@ -122,7 +134,11 @@ object CompetencyFrameworkValidator {
       }
       
       if (StringUtils.equalsIgnoreCase("Yes", timeLimitEnabled)) {
-        val duration = timeLimit.get("duration").asInstanceOf[util.Map[String, AnyRef]]
+        val duration = timeLimit.get("duration") match {
+          case map: util.Map[String, AnyRef] => map
+          case null => null
+          case _ => null // If duration exists but is not a Map, treat as null
+        }
         if (duration == null) {
           throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level timeLimit duration is required when enabled")
         } else {
@@ -152,7 +168,11 @@ object CompetencyFrameworkValidator {
     }
 
     // Validate entranceExam
-    val entranceExam = nodeData.get("entranceExam").asInstanceOf[util.Map[String, AnyRef]]
+    val entranceExam = nodeData.get("entranceExam") match {
+      case map: util.Map[String, AnyRef] => map
+      case null => null
+      case _ => null // If entranceExam exists but is not a Map, treat as null
+    }
     if (entranceExam != null) {
       val entranceExamEnabled = entranceExam.getOrDefault("enabled", "").asInstanceOf[String]
       if (StringUtils.isNotEmpty(entranceExamEnabled) && !StringUtils.equalsAnyIgnoreCase(entranceExamEnabled, "Yes", "No")) {
@@ -168,7 +188,11 @@ object CompetencyFrameworkValidator {
     }
 
     // Validate levelExam
-    val levelExam = nodeData.get("levelExam").asInstanceOf[util.Map[String, AnyRef]]
+    val levelExam = nodeData.get("levelExam") match {
+      case map: util.Map[String, AnyRef] => map
+      case null => null
+      case _ => null // If levelExam exists but is not a Map, treat as null
+    }
     if (levelExam != null) {
       val levelExamCollectionId = levelExam.getOrDefault("collectionId", "").asInstanceOf[String]
       val passingCriteria = levelExam.get("passingCriteria") match {
@@ -196,7 +220,11 @@ object CompetencyFrameworkValidator {
     }
 
     // Validate certificate
-    val certificate = nodeData.get("certificate").asInstanceOf[util.Map[String, AnyRef]]
+    val certificate = nodeData.get("certificate") match {
+      case map: util.Map[String, AnyRef] => map
+      case null => null
+      case _ => null // If certificate exists but is not a Map, treat as null
+    }
     if (certificate != null) {
       val certificateEnabled = certificate.getOrDefault("enabled", "").asInstanceOf[String]
       if (StringUtils.isNotEmpty(certificateEnabled) && !StringUtils.equalsAnyIgnoreCase(certificateEnabled, "Yes", "No")) {
@@ -218,7 +246,11 @@ object CompetencyFrameworkValidator {
     }
     
     competencyLevels.foreach(child => {
-      val entranceExam = child.get("entranceExam").asInstanceOf[util.Map[String, AnyRef]]
+      val entranceExam = child.get("entranceExam") match {
+        case map: util.Map[String, AnyRef] => map
+        case null => null
+        case _ => null // If entranceExam exists but is not a Map, treat as null
+      }
       if (entranceExam == null) {
         throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework with enrollmentType 'Entrance Exam Based' requires all Competency Levels to have entranceExam enabled with collectionId provided")
       } else {
