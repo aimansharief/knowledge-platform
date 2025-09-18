@@ -32,7 +32,11 @@ object CompetencyFrameworkValidator {
         
         val hierarchyData = response.getResult.get("content").asInstanceOf[util.Map[String, AnyRef]]
         val errors = ListBuffer[String]()
-        validateHierarchyRecursive(hierarchyData, errors, node)
+        validateHierarchyRecursive(hierarchyData, errors, node).map { _ =>
+          if (errors.nonEmpty) {
+            throw new ClientException("ERR_VALIDATION_FAILED", s"Validation failed: ${errors.mkString("; ")}")
+          }
+        }
       }
     } else {
       Future.successful(())
