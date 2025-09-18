@@ -166,7 +166,11 @@ object CompetencyFrameworkValidator {
             throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level timeLimit duration value must be at least 1")
           }
           
-          if (StringUtils.isNotEmpty(durationUnit) && !StringUtils.equalsAnyIgnoreCase(durationUnit, "Days", "Months", "Years")) {
+          if (StringUtils.isEmpty(durationUnit)) {
+            throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level timeLimit duration unit is required when enabled")
+          }
+          
+          if (!StringUtils.equalsAnyIgnoreCase(durationUnit, "Days", "Months", "Years")) {
             throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level timeLimit duration unit must be 'Days', 'Months', or 'Years'")
           }
         }
@@ -225,9 +229,12 @@ object CompetencyFrameworkValidator {
         validationFutures += levelExamValidation
       }
       
-      // If passingCriteria is provided, collectionId must be provided
-      if (passingCriteria != null && StringUtils.isEmpty(levelExamCollectionId)) {
-        throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level levelExam collectionId is required when passingCriteria is provided")
+      // If passingCriteria.mustPass is "Yes", collectionId must be provided
+      if (passingCriteria != null) {
+        val mustPass = passingCriteria.getOrDefault("mustPass", "").asInstanceOf[String]
+        if (StringUtils.equalsIgnoreCase("Yes", mustPass) && StringUtils.isEmpty(levelExamCollectionId)) {
+          throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level levelExam collectionId is required when passingCriteria mustPass is Yes")
+        }
       }
     }
 
