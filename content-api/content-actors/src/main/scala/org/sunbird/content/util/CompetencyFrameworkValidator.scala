@@ -6,11 +6,13 @@ import org.sunbird.common.dto.Request
 import org.sunbird.common.exception.ClientException
 import org.sunbird.graph.OntologyEngineContext
 import org.sunbird.graph.dac.model.Node
+import org.sunbird.graph.nodes.DataNode
 import org.sunbird.managers.HierarchyManager
 
 import java.util
 import scala.concurrent.{ExecutionContext, Future}
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
 
 object CompetencyFrameworkValidator {
 
@@ -23,34 +25,42 @@ object CompetencyFrameworkValidator {
       hierarchyRequest.put("rootId", node.getIdentifier)
       hierarchyRequest.put("mode", "edit")
       
-      HierarchyManager.getHierarchy(hierarchyRequest).map { response =>
+      HierarchyManager.getHierarchy(hierarchyRequest).flatMap { response =>
         if (response.getResponseCode.code() != 200) {
           throw new ClientException("ERR_HIERARCHY_NOT_FOUND", "Unable to fetch hierarchy for validation")
         }
         
         val hierarchyData = response.getResult.get("content").asInstanceOf[util.Map[String, AnyRef]]
-        validateHierarchyRecursive(hierarchyData)
+        val errors = ListBuffer[String]()
+        validateHierarchyRecursive(hierarchyData, errors, node)
       }
     } else {
       Future.successful(())
     }
   }
 
-  private def validateHierarchyRecursive(nodeData: util.Map[String, AnyRef]): Unit = {
+  private def validateHierarchyRecursive(nodeData: util.Map[String, AnyRef], errors: ListBuffer[String], parentNode: Node)
+                                (implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Unit] = {
     val primaryCategory = nodeData.getOrDefault("primaryCategory", "").asInstanceOf[String]
     
-    if (StringUtils.equalsIgnoreCase("Competency Framework", primaryCategory)) {
-      validateCompetencyFrameworkNode(nodeData)
+    val currentValidations = if (StringUtils.equalsIgnoreCase("Competency Framework", primaryCategory)) {
+      validateCompetencyFrameworkNode(nodeData, errors, parentNode)
     } else if (StringUtils.equalsIgnoreCase("Competency Level", primaryCategory)) {
-      validateCompetencyLevelNode(nodeData)
+      validateCompetencyLevelNode(nodeData, errors, parentNode)
+    } else {
+      Future.successful(())
     }
     
     // Recursively validate children
     val children = nodeData.getOrDefault("children", new util.ArrayList[util.Map[String, AnyRef]]()).asInstanceOf[util.List[util.Map[String, AnyRef]]]
-    children.asScala.foreach(child => validateHierarchyRecursive(child))
+    val childValidations = children.asScala.map(child => validateHierarchyRecursive(child, errors, parentNode))
+    
+    // Wait for all validations to complete
+    Future.sequence(currentValidations :: childValidations.toList).map(_ => ())
   }
 
-  private def validateCompetencyFrameworkNode(nodeData: util.Map[String, AnyRef]): Unit = {
+  private def validateCompetencyFrameworkNode(nodeData: util.Map[String, AnyRef], errors: ListBuffer[String], parentNode: Node)
+                                         (implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Unit] = {
     // Validate visibility
     val visibility = nodeData.getOrDefault("visibility", "").asInstanceOf[String]
     if (!StringUtils.equalsIgnoreCase("Private", visibility)) {
@@ -90,6 +100,7 @@ object CompetencyFrameworkValidator {
     }
 
     // Validate entranceExam requirement for "Entrance Exam Based" enrollmentType
+    // TODO: Make this async with collectionId validation
     if (StringUtils.equalsIgnoreCase("Entrance Exam Based", enrollmentType)) {
       validateEntranceExamRequiredForFramework(nodeData)
     }
@@ -106,9 +117,14 @@ object CompetencyFrameworkValidator {
         throw new ClientException("ERR_COMPETENCY_FRAMEWORK_VALIDATION", "Competency Framework certificate enabled must be 'Yes' or 'No'")
       }
     }
+    
+    Future.successful(())
   }
 
-  private def validateCompetencyLevelNode(nodeData: util.Map[String, AnyRef]): Unit = {
+  private def validateCompetencyLevelNode(nodeData: util.Map[String, AnyRef], errors: ListBuffer[String], parentNode: Node)
+                                 (implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Unit] = {
+    val validationFutures = ListBuffer[Future[Unit]]()
+    
     // Validate name is required
     val name = nodeData.getOrDefault("name", "").asInstanceOf[String]
     if (StringUtils.isEmpty(name)) {
@@ -184,6 +200,9 @@ object CompetencyFrameworkValidator {
         if (StringUtils.isEmpty(collectionId)) {
           throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level entranceExam collectionId is required when enabled")
         }
+        // Add async validation for entranceExam collectionId
+        val entranceExamValidation = validateCourseExists(collectionId, "entranceExam", errors)(oec, ec, parentNode)
+        validationFutures += entranceExamValidation
       }
     }
 
@@ -211,6 +230,9 @@ object CompetencyFrameworkValidator {
             throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level levelExam passingCriteria mustPass must be 'Yes' or 'No'")
           }
         }
+        // Add async validation for levelExam collectionId
+        val levelExamValidation = validateCourseExists(levelExamCollectionId, "levelExam", errors)(oec, ec, parentNode)
+        validationFutures += levelExamValidation
       }
       
       // If passingCriteria is provided, collectionId must be provided
@@ -231,6 +253,9 @@ object CompetencyFrameworkValidator {
         throw new ClientException("ERR_COMPETENCY_LEVEL_VALIDATION", "Competency Level certificate enabled must be 'Yes' or 'No'")
       }
     }
+    
+    // Wait for all async validations to complete
+    Future.sequence(validationFutures.toList).map(_ => ())
   }
 
   private def validateEntranceExamRequiredForFramework(nodeData: util.Map[String, AnyRef]): Unit = {
@@ -261,5 +286,63 @@ object CompetencyFrameworkValidator {
         }
       }
     })
+  }
+
+  // Validate that the given collectionId exists and is of contentType=Course and status=Live.
+  def validateCourseExists(collectionId: String, fieldName: String, errors: ListBuffer[String])
+                          (implicit oec: OntologyEngineContext, ec: ExecutionContext, parentNode: Node): Future[Unit] = {
+    if (StringUtils.isBlank(collectionId)) {
+      val msg = s"$fieldName collectionId is missing"
+      errors += msg
+      Future.failed(new ClientException("ERR_BLANK_COLLECTION_ID", msg))
+    } else {
+      val request = new Request()
+      Option(request.getContext).getOrElse {
+        val context = new java.util.HashMap[String, AnyRef]()
+        request.setContext(context)
+        context
+      }
+
+      val parentMetadata = parentNode.getMetadata.asScala
+      val graphId = parentMetadata.getOrElse("graphId", parentNode.getGraphId).toString.toLowerCase
+      val channel = parentMetadata.getOrElse("channel", "").toString.toLowerCase
+      val objectType = parentMetadata.getOrElse("objectType", "").toString.toLowerCase
+
+      val contextMap = Map[String, AnyRef](
+        "identifier" -> collectionId,
+        "graph_id" -> graphId,
+        "channel" -> channel,
+        "schemaName" -> objectType,
+        "version" -> "1.0",
+        "objectType" -> objectType
+      )
+      contextMap.foreach { case (k, v) => request.getContext.put(k, v) }
+      request.put("identifier", collectionId)
+      request.put("objectType", objectType)
+
+      DataNode.read(request).flatMap { node =>
+        if (node == null) {
+          val msg = s"$fieldName collectionId $collectionId not found"
+          errors += msg
+          Future.failed(new ClientException("ERR_COLLECTION_NOT_FOUND", msg))
+        } else {
+          val metadata = node.getMetadata.asScala
+          val status = metadata.getOrElse("status", "").toString
+          val contentType = metadata.getOrElse("contentType", "").toString
+
+          if (!"Course".equalsIgnoreCase(contentType)) {
+            val msg = s"$fieldName collectionId $collectionId has invalid contentType: $contentType (expected Course)"
+            errors += msg
+            Future.failed(new ClientException("ERR_INVALID_CONTENT_TYPE", msg))
+          } else if (!"Live".equalsIgnoreCase(status)) {
+            val msg = s"$fieldName collectionId $collectionId has invalid status: $status (expected Live)"
+            errors += msg
+            Future.failed(new ClientException("ERR_INVALID_STATUS", msg))
+          } else {
+            Future.unit
+          }
+        }
+      }
+    }
   }
 }
