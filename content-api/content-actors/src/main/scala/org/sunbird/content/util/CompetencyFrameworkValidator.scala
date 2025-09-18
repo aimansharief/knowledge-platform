@@ -97,7 +97,6 @@ object CompetencyFrameworkValidator {
     }
 
     // Validate entranceExam requirement for "Entrance Exam Based" enrollmentType
-    // TODO: Make this async with collectionId validation
     if (StringUtils.equalsIgnoreCase("Entrance Exam Based", enrollmentType)) {
       validateEntranceExamRequiredForFramework(nodeData)
     }
