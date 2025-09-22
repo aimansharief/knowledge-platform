@@ -52,7 +52,7 @@ object UpdateHierarchyManager {
                   updateNodesModifiedInNodeList(nodes, nodesModified, request, idMap).map(modifiedNodeList => {
                       getChildrenHierarchy(modifiedNodeList, rootId, hierarchy, idMap, result._1, request).map(children => {
                           TelemetryManager.log("Children for root id :" + rootId +" :: " + JsonUtils.serialize(children))
-                          updateHierarchyData(rootId, children, modifiedNodeList, request).map(node => {
+                          updateHierarchyData(rootId, children, modifiedNodeList, request, idMap).map(node => {
                               val response = ResponseHandler.OK()
                               response.put(HierarchyConstants.CONTENT_ID, rootId)
                               idMap.remove(rootId)
@@ -442,16 +442,20 @@ object UpdateHierarchyManager {
         children.forall(child => populatedChildMap.containsKey(child))
     }
 
-    def updateHierarchyData(rootId: String, children: java.util.List[java.util.Map[String, AnyRef]], nodeList: List[Node], request: Request)(implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Node] = {
+    def updateHierarchyData(rootId: String, children: java.util.List[java.util.Map[String, AnyRef]], nodeList: List[Node], request: Request, idMap: mutable.Map[String, String])(implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Node] = {
         val reqHierarchy: java.util.HashMap[String, AnyRef] = request.getRequest.get(HierarchyConstants.HIERARCHY).asInstanceOf[java.util.HashMap[String, AnyRef]]
+        // Remap reqHierarchy keys using idMap; if not found, keep the original key
+        val remappedReqHierarchy: java.util.Map[String, AnyRef] = new java.util.HashMap[String, AnyRef]()
         val rmSchemaValidator = SchemaValidatorFactory.getInstance(HierarchyConstants.RELATIONAL_METADATA.toLowerCase(), "1.0")
-
-        reqHierarchy.foreach(rec=> {
-           if(rec._2.asInstanceOf[java.util.Map[String,AnyRef]].containsKey(HierarchyConstants.RELATIONAL_METADATA)) {
-               val rmObj = rec._2.asInstanceOf[java.util.Map[String,AnyRef]](HierarchyConstants.RELATIONAL_METADATA)
-               rmObj.asInstanceOf[java.util.Map[String,AnyRef]].foreach(rmChild=>{
-                   rmSchemaValidator.validate(rmChild._2.asInstanceOf[java.util.Map[String, AnyRef]])
-               })
+        reqHierarchy.foreach(entry => {
+            val newKey = idMap.getOrElse(entry._1, entry._1)
+            remappedReqHierarchy.put(newKey, entry._2)
+            val valueMap = entry._2.asInstanceOf[java.util.Map[String,AnyRef]]
+            if(valueMap.containsKey(HierarchyConstants.RELATIONAL_METADATA)) {
+                val rmObj = valueMap.get(HierarchyConstants.RELATIONAL_METADATA)
+                rmObj.asInstanceOf[java.util.Map[String,AnyRef]].foreach(rmChild=>{
+                    rmSchemaValidator.validate(rmChild._2.asInstanceOf[java.util.Map[String, AnyRef]])
+                })
             }
         })
 
@@ -464,7 +468,7 @@ object UpdateHierarchyManager {
         val metadata = cleanUpRootData(node)
         req.getRequest.putAll(metadata)
         req.put(HierarchyConstants.HIERARCHY, ScalaJsonUtils.serialize(updatedHierarchy))
-        req.put(HierarchyConstants.RELATIONAL_METADATA_COL, ScalaJsonUtils.serialize(reqHierarchy))
+        req.put(HierarchyConstants.RELATIONAL_METADATA_COL, ScalaJsonUtils.serialize(remappedReqHierarchy))
         req.put(HierarchyConstants.IDENTIFIER, rootId)
         req.put(HierarchyConstants.CHILDREN, new java.util.ArrayList())
         req.put(HierarchyConstants.CONCEPTS, new java.util.ArrayList())
