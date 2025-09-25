@@ -78,15 +78,17 @@ class StorageService {
         getService.deleteObject(getContainerName, key, isDirectory)
     }
 
-    def getSignedURL(key: String, ttl: Option[Int], permission: Option[String], uploadType: Option[String] = None): String = {
+    def getSignedURL(key: String, ttl: Option[Int], permission: Option[String], contentType: Option[String] = None, uploadType: Option[String] = None): String = {
       if(storageType == "gcloud") {
         val isChunked: Boolean = uploadType.exists(_.equalsIgnoreCase("chunked"))
+        val finalContentType = contentType.getOrElse("video/mp4")
         val baseParams: Map[String, String] = Map(
           "clientId" -> (if (Platform.config.hasPath("cloud_storage_client_id")) Platform.config.getString("cloud_storage_client_id") else ""),
           "privateKeyIds" -> (if (Platform.config.hasPath("cloud_storage_private_key_id")) Platform.config.getString("cloud_storage_private_key_id") else ""),
           "projectId" -> (if (Platform.config.hasPath("cloud_storage_project_id")) Platform.config.getString("cloud_storage_project_id") else ""),
           "privateKeyPkcs8" -> (if (Platform.config.hasPath("cloud_storage_secret")) Platform.config.getString("cloud_storage_secret") else ""),
-          "clientEmail" -> (if (Platform.config.hasPath("cloud_storage_key")) Platform.config.getString("cloud_storage_key") else "")
+          "clientEmail" -> (if (Platform.config.hasPath("cloud_storage_key")) Platform.config.getString("cloud_storage_key") else ""),
+          "contentType" -> finalContentType
         )
         val additionalParams: Map[String, String] = if (isChunked) baseParams ++ Map("chunked" -> "true") else baseParams
         getService.getPutSignedURL(getContainerName, key, ttl, permission, additionalParams = Option.apply(additionalParams))

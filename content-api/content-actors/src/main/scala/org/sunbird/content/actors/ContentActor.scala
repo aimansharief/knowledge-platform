@@ -173,12 +173,13 @@ class ContentActor @Inject() (implicit oec: OntologyEngineContext, ss: StorageSe
 		val filePath: String = request.getRequest.getOrDefault("filePath","").asInstanceOf[String]
 			.replaceAll("^/+|/+$", "")
 		val identifier: String = request.get(ContentConstants.IDENTIFIER).asInstanceOf[String]
+		val contentType: String = Option(request.get("contentType")).map(_.asInstanceOf[String]).getOrElse("video/mp4")
 		validatePreSignedUrlRequest(`type`, fileName, filePath)
 		DataNode.read(request).map(node => {
 			val objectKey = if (StringUtils.isEmpty(filePath)) "content" + File.separator + `type` + File.separator + identifier + File.separator + Slug.makeSlug(fileName, true)
 				else filePath + File.separator + "content" + File.separator + `type` + File.separator + identifier + File.separator + Slug.makeSlug(fileName, true)
 			val expiry = Platform.config.getString("cloud_storage.upload.url.ttl")
-			val preSignedURL = ss.getSignedURL(objectKey, Option.apply(expiry.toInt), Option.apply("w"), Option.apply(uploadType))
+			val preSignedURL = ss.getSignedURL(objectKey, Option.apply(expiry.toInt), Option.apply("w"), Option.apply(contentType), Option.apply(uploadType))
 			ResponseHandler.OK().put(ContentConstants.IDENTIFIER, identifier).put("pre_signed_url", preSignedURL)
 				.put("url_expiry", expiry)
 		}) recoverWith { case e: CompletionException => throw e.getCause }
