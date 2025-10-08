@@ -165,15 +165,38 @@ class ContentActor @Inject() (implicit oec: OntologyEngineContext, ss: StorageSe
 	}
 
 	def uploadPreSignedUrl(request: Request): Future[Response] = {
-		val `type`: String = request.get("type").asInstanceOf[String].toLowerCase()
-		val uploadType: String = Option(request.get("uploadType")).map(_.asInstanceOf[String]).getOrElse("single").toLowerCase()
+		val `type`: String = Option(request.get("type")).map {
+			case s: String => s
+			case _ => throw new ClientException("ERR_INVALID_TYPE", "type must be a string")
+		}.getOrElse(throw new ClientException("ERR_MISSING_TYPE", "type is required")).toLowerCase()
+		
+		val uploadType: String = Option(request.get("uploadType")).map {
+			case s: String => s
+			case _ => "single"
+		}.getOrElse("single").toLowerCase()
+		
 		if(!List("single", "chunked").contains(uploadType))
 			throw new ClientException("ERR_INVALID_UPLOAD_TYPE", "Invalid uploadType. It should be one of single, chunked")
-		val fileName: String = request.get("fileName").asInstanceOf[String]
-		val filePath: String = request.getRequest.getOrDefault("filePath","").asInstanceOf[String]
-			.replaceAll("^/+|/+$", "")
-		val identifier: String = request.get(ContentConstants.IDENTIFIER).asInstanceOf[String]
-		val contentType: String = Option(request.get("contentType")).map(_.asInstanceOf[String]).getOrElse("video/mp4")
+		
+		val fileName: String = Option(request.get("fileName")).map {
+			case s: String => s
+			case _ => throw new ClientException("ERR_INVALID_FILE_NAME", "fileName must be a string")
+		}.getOrElse(throw new ClientException("ERR_MISSING_FILE_NAME", "fileName is required"))
+		
+		val filePath: String = Option(request.getRequest.getOrDefault("filePath","")).map {
+			case s: String => s.replaceAll("^/+|/+$", "")
+			case _ => ""
+		}.getOrElse("").replaceAll("^/+|/+$", "")
+		
+		val identifier: String = Option(request.get(ContentConstants.IDENTIFIER)).map {
+			case s: String => s
+			case _ => throw new ClientException("ERR_INVALID_IDENTIFIER", "identifier must be a string")
+		}.getOrElse(throw new ClientException("ERR_MISSING_IDENTIFIER", "identifier is required"))
+		
+		val contentType: String = Option(request.get("contentType")).map {
+			case s: String => s
+			case _ => "video/mp4"
+		}.getOrElse("video/mp4")
 		validatePreSignedUrlRequest(`type`, fileName, filePath)
 		DataNode.read(request).map(node => {
 			val objectKey = if (StringUtils.isEmpty(filePath)) "content" + File.separator + `type` + File.separator + identifier + File.separator + Slug.makeSlug(fileName, true)
