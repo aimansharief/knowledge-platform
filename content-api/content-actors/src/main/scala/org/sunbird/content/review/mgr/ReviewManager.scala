@@ -17,6 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object ReviewManager {
 
+	private val AUTO_PUBLISH_ENABLED: Boolean = Platform.getBoolean("content.auto_publish.enabled", false)
 	private val AUTO_PUBLISH_PRIMARY_CATEGORIES: util.List[String] = Platform.getStringList("content.auto_publish_categories", new util.ArrayList[String]())
 
 	def review(request: Request, node: Node)(implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Response] = {
@@ -33,8 +34,8 @@ object ReviewManager {
 				updateReq.putAll(result.asJava)
 				DataNode.update(updateReq).map(updatedNode => {
 					val primaryCategory = updatedNode.getMetadata.getOrDefault("primaryCategory", "").asInstanceOf[String]
-					// Check if primaryCategory matches the configured list for auto-publish
-					if (StringUtils.isNotBlank(primaryCategory) && AUTO_PUBLISH_PRIMARY_CATEGORIES.contains(primaryCategory)) {
+					// Check if auto-publish is enabled and primaryCategory matches the configured list
+					if (AUTO_PUBLISH_ENABLED && StringUtils.isNotBlank(primaryCategory) && AUTO_PUBLISH_PRIMARY_CATEGORIES.contains(primaryCategory)) {
 						// Trigger publish with System as publisher and return publish response
 						triggerPublish(request, updatedNode)
 					} else {
