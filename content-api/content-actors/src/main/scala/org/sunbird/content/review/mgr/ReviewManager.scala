@@ -35,11 +35,12 @@ object ReviewManager {
 					val primaryCategory = updatedNode.getMetadata.getOrDefault("primaryCategory", "").asInstanceOf[String]
 					// Check if primaryCategory matches the configured list for auto-publish
 					if (StringUtils.isNotBlank(primaryCategory) && AUTO_PUBLISH_PRIMARY_CATEGORIES.contains(primaryCategory)) {
-						// Trigger publish with System as publisher (asynchronously, don't wait for completion)
+						// Trigger publish with System as publisher and return publish response
 						triggerPublish(request, updatedNode)
+					} else {
+						Future(ResponseHandler.OK.putAll(Map("identifier" -> updatedNode.getIdentifier.replace(".img", ""), "versionKey" -> updatedNode.getMetadata.get("versionKey")).asJava))
 					}
-					ResponseHandler.OK.putAll(Map("identifier" -> updatedNode.getIdentifier.replace(".img", ""), "versionKey" -> updatedNode.getMetadata.get("versionKey")).asJava)
-				})
+				}).flatMap(f => f)
 			}).flatMap(f => f)
 		}
 	}
