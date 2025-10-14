@@ -202,6 +202,7 @@ class ContentActor @Inject() (implicit oec: OntologyEngineContext, ss: StorageSe
 			val objectKey = if (StringUtils.isEmpty(filePath)) "content" + File.separator + `type` + File.separator + identifier + File.separator + Slug.makeSlug(fileName, true)
 				else filePath + File.separator + "content" + File.separator + `type` + File.separator + identifier + File.separator + Slug.makeSlug(fileName, true)
 			val expiry = Platform.config.getString("cloud_storage.upload.url.ttl")
+			TelemetryManager.info(s"Generating pre-signed URL for identifier: $identifier, fileName: $fileName, uploadType: $uploadType, contentType: $contentType")
 			val preSignedURL = ss.getSignedURL(objectKey, Option.apply(expiry.toInt), Option.apply("w"), Option.apply(contentType), Option.apply(uploadType))
 			ResponseHandler.OK().put(ContentConstants.IDENTIFIER, identifier).put("pre_signed_url", preSignedURL)
 				.put("url_expiry", expiry)

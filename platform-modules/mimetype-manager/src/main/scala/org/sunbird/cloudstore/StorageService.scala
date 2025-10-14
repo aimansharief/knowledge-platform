@@ -91,7 +91,7 @@ class StorageService {
           "contentType" -> finalContentType
         )
         val additionalParams: Map[String, String] = if (isChunked) baseParams ++ Map("chunked" -> "true") else baseParams
-        getService.getPutSignedURL(getContainerName, key, ttl, permission, additionalParams = Option.apply(additionalParams))
+        getService.getPutSignedURL(getContainerName, key, ttl, permission, contentType, additionalParams = Option.apply(additionalParams))
       }
       else getService.getPutSignedURL(getContainerName, key, ttl, permission)
     }
