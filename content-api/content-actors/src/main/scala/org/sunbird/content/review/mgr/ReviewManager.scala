@@ -14,6 +14,8 @@ import java.util
 import scala.collection.Map
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
+import org.sunbird.common.exception.ResponseCode
+import org.sunbird.telemetry.logger.TelemetryManager
 
 object ReviewManager {
 
@@ -34,9 +36,7 @@ object ReviewManager {
 				updateReq.putAll(result.asJava)
 				DataNode.update(updateReq).map(updatedNode => {
 					val primaryCategory = updatedNode.getMetadata.getOrDefault("primaryCategory", "").asInstanceOf[String]
-					// Check if auto-publish is enabled and primaryCategory matches the configured list
 					if (AUTO_PUBLISH_ENABLED && StringUtils.isNotBlank(primaryCategory) && AUTO_PUBLISH_PRIMARY_CATEGORIES.contains(primaryCategory)) {
-						// Trigger publish with System as publisher and return publish response
 						triggerPublish(request, updatedNode)
 					} else {
 						Future(ResponseHandler.OK.putAll(Map("identifier" -> updatedNode.getIdentifier.replace(".img", ""), "versionKey" -> updatedNode.getMetadata.get("versionKey")).asJava))
@@ -47,11 +47,14 @@ object ReviewManager {
 	}
 
 	private def triggerPublish(request: Request, node: Node)(implicit oec: OntologyEngineContext, ec: ExecutionContext): Future[Response] = {
-		// Create a new request for publish operation
 		val publishReq = new Request(request)
 		publishReq.getRequest.put(ContentConstants.LAST_PUBLISHED_BY, ContentConstants.SYSTEM)
 		node.getMetadata.put(ContentConstants.LAST_PUBLISHED_BY, ContentConstants.SYSTEM)
-		PublishManager.publish(publishReq, node)
+		PublishManager.publish(publishReq, node).recover {
+			case ex: Exception =>
+				TelemetryManager.error(s"Auto-publish failed for identifier: ${node.getIdentifier}", ex)
+				ResponseHandler.ERROR(ResponseCode.SERVER_ERROR, "ERR_AUTO_PUBLISH_FAILED", Option(ex.getMessage).getOrElse("Auto-publish failed"))
+		}
 	}
 }
 
