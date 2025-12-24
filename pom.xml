@@ -15,6 +15,7 @@
 		<scala.maj.version>2.13</scala.maj.version>
 		<scala.version>2.13.18</scala.version>
 		<scalatest.version>3.0.8</scalatest.version>
+		<scala.maven.plugin>4.9.1</scala.maven.plugin>
 		<fasterxml.jackson.version>2.15.3</fasterxml.jackson.version>
 	</properties>
 	<profiles>
