@@ -318,6 +318,16 @@
                 <configuration>
                     <scalacOptions>-feature -deprecation -Xfatal-warnings</scalacOptions>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>default-compile</id>
+                        <phase>none</phase>
+                    </execution>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.scoverage</groupId>
