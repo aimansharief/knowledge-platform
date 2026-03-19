@@ -192,6 +192,7 @@ object UpdateHierarchyManager {
                 childData.put(HierarchyConstants.AUDIENCE, rootNode.getMetadata.get(HierarchyConstants.AUDIENCE) )
                 HierarchyBackwardCompatibilityUtil.setContentAndCategoryTypes(childData)
                 val node = NodeUtil.deserialize(childData, request.getContext.get(HierarchyConstants.SCHEMA_NAME).asInstanceOf[String], DefinitionNode.getRelationsMap(request))
+                node.setGraphId(HierarchyConstants.TAXONOMY_ID)
                 HierarchyBackwardCompatibilityUtil.setNewObjectType(node)
                 val updatedNodes = node :: nodes
                 Future(updatedNodes)

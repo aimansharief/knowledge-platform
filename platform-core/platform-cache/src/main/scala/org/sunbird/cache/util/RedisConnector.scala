@@ -13,7 +13,12 @@ trait RedisConnector {
 	private val PORT = Platform.getInteger("redis.port", 6379)
 	private val MAX_CONNECTIONS = Platform.getInteger("redis.maxConnections", 128)
 	private val INDEX = Platform.getInteger("redis.dbIndex", 0)
-	private val jedisPool: JedisPool = new JedisPool(getConfig(), HOST, PORT)
+	protected val isEnabled: Boolean = Platform.getBoolean("redis.enable", false)
+
+	private lazy val jedisPool: JedisPool = {
+		TelemetryManager.info("Initializing Redis connection pool at " + HOST + ":" + PORT)
+		new JedisPool(getConfig(), HOST, PORT)
+	}
 
 	registerShutdownHook()
 
@@ -22,12 +27,10 @@ trait RedisConnector {
 	 *
 	 * @return Jedis Object
 	 */
-	protected def getConnection: Jedis = try {
+	protected def getConnection: Jedis = if (!isEnabled) null else {
 		val jedis = jedisPool.getResource
 		if (INDEX > 0) jedis.select(INDEX)
 		jedis
-	} catch {
-		case e: Exception => throw e
 	}
 
 	/**
@@ -51,7 +54,7 @@ trait RedisConnector {
 	 * Called automatically via the JVM shutdown hook.
 	 */
 	def closePool(): Unit = {
-		if (jedisPool != null && !jedisPool.isClosed) {
+		if (isEnabled && jedisPool != null && !jedisPool.isClosed) {
 			try jedisPool.close()
 			catch {
 				case e: Exception => TelemetryManager.error("Error closing JedisPool: " + e.getMessage, e)
@@ -60,7 +63,7 @@ trait RedisConnector {
 	}
 
 	private def registerShutdownHook(): Unit = {
-		Runtime.getRuntime.addShutdownHook(new Thread(() => {
+		if (isEnabled) Runtime.getRuntime.addShutdownHook(new Thread(() => {
 			TelemetryManager.log("Shutting down RedisConnector — closing connection pool")
 			closePool()
 		}))
