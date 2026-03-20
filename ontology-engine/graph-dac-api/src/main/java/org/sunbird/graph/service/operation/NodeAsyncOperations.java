@@ -83,6 +83,8 @@ public class NodeAsyncOperations {
 
                 // Serialize complex objects (Maps, Lists, Arrays) to JSON strings —
                 Map<String, Object> metadata = setPrimitiveData(node.getMetadata());
+                // Sync serialized values back so the returned node's metadata reflects what was written to DB
+                node.getMetadata().putAll(metadata);
 
                 // Create vertex using Native API
                 JanusGraphVertex vertex = tx.addVertex(node.getObjectType());
@@ -208,6 +210,8 @@ public class NodeAsyncOperations {
                 TelemetryManager.info("NodeAsyncOperations: Upserting Node with Status: "
                         + node.getMetadata().get("status") + " | ID: " + identifier);
                 Map<String, Object> metadata = setPrimitiveData(node.getMetadata());
+                // Sync serialized values back so the returned node's metadata reflects what was written to DB
+                node.getMetadata().putAll(metadata);
 
                 // Determine which properties to write.
                 Set<String> updatedFields = node.getUpdatedFields();
