@@ -20,15 +20,23 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+
 public class CassandraConnector {
 
-	private static final Map<String, Session> sessionMap             = new ConcurrentHashMap<>();
-	private static final Map<String, Cluster> clusterMap             = new ConcurrentHashMap<>();
+	private static final Map<String, Session> sessionMap            = new ConcurrentHashMap<>();
+	private static final Map<String, Cluster> clusterMap            = new ConcurrentHashMap<>();
 	private static final AtomicBoolean        shutdownHookRegistered = new AtomicBoolean(false);
+
+	/** Maximum number of connection attempts made at JVM startup. */
+	private static final int  MAX_STARTUP_RETRIES = 30;
+	/** Initial retry wait (doubles each attempt, capped at RETRY_MAX_MS). */
+	private static final long RETRY_BASE_MS       = 2_000L;
+	/** Ceiling for the retry wait interval. */
+	private static final long RETRY_MAX_MS        = 30_000L;
 
 	static {
 		if (Platform.getBoolean("service.db.cassandra.enabled", true))
-			prepareSession("lp", getConsistencyLevel("lp"));
+			prepareSessionWithRetry("lp", getConsistencyLevel("lp"));
 	}
 
 	public static Session getSession() {
@@ -94,6 +102,47 @@ public class CassandraConnector {
 		sessionMap.clear();
 		clusterMap.clear();
 	}
+
+	/**
+	 * Startup retry loop — called only from the static initialiser.
+	 * Retries up to MAX_STARTUP_RETRIES times with exponential backoff and
+	 * full jitter so the service can tolerate Cassandra starting after the JVM.
+	 */
+	private static void prepareSessionWithRetry(String sessionKey, ConsistencyLevel level) {
+		int  attempt = 0;
+		long cap     = RETRY_BASE_MS;
+
+		while (attempt < MAX_STARTUP_RETRIES) {
+			attempt++;
+			try {
+				prepareSession(sessionKey, level);
+				TelemetryManager.log(
+						"Cassandra session ready for [" + sessionKey + "] on attempt " + attempt);
+				return;
+			} catch (Exception e) {
+				TelemetryManager.error("Cassandra connect attempt " + attempt + "/"
+						+ MAX_STARTUP_RETRIES + " failed for [" + sessionKey + "]: "
+						+ e.getMessage(), e);
+
+				if (attempt < MAX_STARTUP_RETRIES) {
+					// Full jitter: sleep = random(0, min(cap, RETRY_MAX_MS))
+					long sleep = (long) (Math.random() * Math.min(cap, RETRY_MAX_MS));
+					try {
+						Thread.sleep(sleep);
+					} catch (InterruptedException ie) {
+						Thread.currentThread().interrupt();
+						TelemetryManager.error(
+								"Cassandra startup retry interrupted for [" + sessionKey + "]", ie);
+						return;
+					}
+					cap = Math.min(cap * 2, RETRY_MAX_MS);
+				}
+			}
+		}
+		TelemetryManager.error("All " + MAX_STARTUP_RETRIES
+				+ " Cassandra startup connect attempts exhausted for [" + sessionKey + "]");
+	}
+
 
 	/**
 	 * Creates a brand-new Cluster and Session for {@code sessionKey} and stores
