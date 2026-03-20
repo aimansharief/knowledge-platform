@@ -15,9 +15,17 @@ trait RedisConnector {
 	private val INDEX = Platform.getInteger("redis.dbIndex", 0)
 	protected val isEnabled: Boolean = Platform.getBoolean("redis.enable", false)
 
-	private lazy val jedisPool: JedisPool = {
-		TelemetryManager.info("Initializing Redis connection pool at " + HOST + ":" + PORT)
-		new JedisPool(getConfig(), HOST, PORT)
+	@volatile private var jedisPoolOpt: Option[JedisPool] = None
+
+	private def jedisPool: JedisPool = this.synchronized {
+		jedisPoolOpt match {
+			case Some(pool) => pool
+			case None =>
+				TelemetryManager.info("Initializing Redis connection pool at " + HOST + ":" + PORT)
+				val pool = new JedisPool(getConfig(), HOST, PORT)
+				jedisPoolOpt = Some(pool)
+				pool
+		}
 	}
 
 	registerShutdownHook()
@@ -54,11 +62,16 @@ trait RedisConnector {
 	 * Called automatically via the JVM shutdown hook.
 	 */
 	def closePool(): Unit = {
-		if (isEnabled && jedisPool != null && !jedisPool.isClosed) {
-			try jedisPool.close()
-			catch {
-				case e: Exception => TelemetryManager.error("Error closing JedisPool: " + e.getMessage, e)
+		if (isEnabled) {
+			jedisPoolOpt.foreach { pool =>
+				if (!pool.isClosed) {
+					try pool.close()
+					catch {
+						case e: Exception => TelemetryManager.error("Error closing JedisPool: " + e.getMessage, e)
+					}
+				}
 			}
+			jedisPoolOpt = None
 		}
 	}
 

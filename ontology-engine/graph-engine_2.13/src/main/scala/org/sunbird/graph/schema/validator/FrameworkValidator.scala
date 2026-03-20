@@ -66,10 +66,10 @@ trait FrameworkValidator extends IDefinition {
               val errors = errorList.filter(_.nonEmpty)
               if (errors.nonEmpty)
                 throw new ClientException("CLIENT_ERROR", "Validation Errors.", errors.asJava)
-              super.validate(node, operation)
+              super.validate(node, operation, setDefaultValue)
             }
-          } else super.validate(node, operation)
-        } else super.validate(node, operation)
+          } else super.validate(node, operation, setDefaultValue)
+        } else super.validate(node, operation, setDefaultValue)
       })
     }).flatten
   }

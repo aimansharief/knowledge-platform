@@ -51,9 +51,9 @@ trait PropAsEdgeValidator extends IDefinition {
                             throw new ClientException("ERR_INVALID_EDGE_PROPERTY", key + " given datatype is invalid.")
                         }
                     }
-                }).flatMap(_ => super.validate(node, operation))
-            } else super.validate(node, operation)
-        } else super.validate(node, operation)
+                }).flatMap(_ => super.validate(node, operation, setDefaultValue))
+            } else super.validate(node, operation, setDefaultValue)
+        } else super.validate(node, operation, setDefaultValue)
     }
 
     private def getEdgeListFromDB(
