@@ -205,7 +205,8 @@ object HierarchyManager {
 
     @throws[Exception]
     def getPublishedHierarchy(request: Request)(implicit ec: ExecutionContext, oec: OntologyEngineContext): Future[Response] = {
-        val redisHierarchy = RedisCache.get(hierarchyPrefix + request.get("rootId"))
+        val collectionCacheEnabled = Platform.getBoolean("collection.cache.enable", false)
+        val redisHierarchy = if (collectionCacheEnabled) RedisCache.get(hierarchyPrefix + request.get("rootId")) else ""
         val hierarchyFuture = if (StringUtils.isNotEmpty(redisHierarchy)) {
             Future(Map("content" -> JsonUtils.deserialize(redisHierarchy, classOf[java.util.Map[String, AnyRef]])).asJava)
         } else getCassandraHierarchy(request)

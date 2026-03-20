@@ -14,7 +14,14 @@ import scala.jdk.CollectionConverters._
 object RedisCache extends RedisConnector {
 
 	private val logger: Logger = LoggerFactory.getLogger(RedisCache.getClass.getCanonicalName)
-	private val isRedisEnabled = if (Platform.config.hasPath("redis.enable")) Platform.config.getBoolean("redis.enable") else true
+	private val isRedisEnabled = Platform.getBoolean("redis.enable", false)
+
+	if (isRedisEnabled)
+		logger.info("RedisCache initialized — Redis ENABLED ({}:{})",
+			Platform.getString("redis.host", "localhost"),
+			Platform.getInteger("redis.port", 6379).toString)
+	else
+		logger.info("RedisCache initialized — Redis DISABLED. All reads fall back to primary DB; writes are no-ops.")
 
 	/**
 	 * This method store string data into cache for given Key
