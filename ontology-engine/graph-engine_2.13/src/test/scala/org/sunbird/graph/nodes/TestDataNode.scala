@@ -15,7 +15,7 @@ import scala.concurrent.Future
 class TestDataNode extends BaseSpec {
 
     override def createVertex(label: String, properties: Map[String, AnyRef]): Unit = {
-        val vertex = graph.asInstanceOf[org.janusgraph.core.JanusGraphTransaction].addVertex(org.apache.tinkerpop.gremlin.structure.T.label, label)
+        val vertex = graph.addVertex(org.apache.tinkerpop.gremlin.structure.T.label, label)
         properties.foreach { case (k, v) => vertex.property(k, v) }
     }
 
