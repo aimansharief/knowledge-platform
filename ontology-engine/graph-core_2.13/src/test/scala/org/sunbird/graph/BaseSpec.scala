@@ -1,23 +1,56 @@
 package org.sunbird.graph
 
-import java.io.File
-import com.typesafe.config.ConfigFactory
-import org.apache.commons.io.FileUtils
-import org.cassandraunit.utils.EmbeddedCassandraServerHelper
+import com.datastax.driver.core.{Cluster, ProtocolVersion, Session}
 import org.scalatest.{AsyncFlatSpec, BeforeAndAfterAll, Matchers}
 import org.sunbird.cassandra.CassandraConnector
-import org.sunbird.common.Platform
 import org.janusgraph.core.JanusGraph
 import org.janusgraph.core.JanusGraphFactory
-import org.sunbird.graph.service.util.DriverUtil
-import java.lang.reflect.Field
+import org.testcontainers.containers.CassandraContainer
+
 import java.util
 import scala.collection.JavaConverters._
+
+/**
+ * Singleton that manages a single shared Cassandra testcontainer for all test suites
+ * in graph-core_2.13.  The container is started lazily on first access and is never
+ * explicitly stopped — Testcontainers' Ryuk reaper handles teardown after the JVM exits.
+ */
+object CassandraTestSupport {
+
+    val container: CassandraContainer[_] = {
+        val c = new CassandraContainer("cassandra:3.11")
+        c.start()
+        c
+    }
+
+    private val cluster: Cluster =
+        Cluster.builder()
+            .addContactPoint(container.getHost)
+            .withPort(container.getMappedPort(9042))
+            .withoutJMXReporting()
+            .withProtocolVersion(ProtocolVersion.V4)
+            .build()
+
+    /** Open a new Session against the shared container cluster. */
+    def newSession(): Session = cluster.connect()
+
+    /**
+     * Inject the given session into CassandraConnector's private static sessionMap
+     * under key "lp" so that CassandraConnector.getSession() returns our container
+     * session instead of trying to reach a real Cassandra host.
+     */
+    def injectIntoConnector(session: Session): Unit = {
+        val field = classOf[CassandraConnector].getDeclaredField("sessionMap")
+        field.setAccessible(true)
+        val map = field.get(null).asInstanceOf[java.util.Map[String, Session]]
+        map.put("lp", session)
+    }
+}
 
 class BaseSpec extends AsyncFlatSpec with Matchers with BeforeAndAfterAll {
 
     var graph: JanusGraph = _
-    var session: com.datastax.driver.core.Session = null
+    var session: Session = null
     implicit val oec: OntologyEngineContext = new OntologyEngineContext
 
     private val script_1 = "CREATE KEYSPACE IF NOT EXISTS content_store WITH replication = {'class': 'SimpleStrategy','replication_factor': '1'};"
@@ -49,14 +82,14 @@ class BaseSpec extends AsyncFlatSpec with Matchers with BeforeAndAfterAll {
         }
     }
 
-    def setUpEmbeddedCassandra(): Unit = {
-        System.setProperty("cassandra.unsafesystem", "true")
-        EmbeddedCassandraServerHelper.startEmbeddedCassandra("/cassandra-unit.yaml", 100000L)
+    def setUpCassandraContainer(): Unit = {
+        session = CassandraTestSupport.newSession()
+        CassandraTestSupport.injectIntoConnector(session)
     }
 
     override def beforeAll(): Unit = {
         setUpEmbeddedGraph()
-        setUpEmbeddedCassandra()
+        setUpCassandraContainer()
         createRelationData()
         executeCassandraQuery(script_1, script_2, script_3, script_4, script_5, script_6, script_7, script_8, script_9, script_10, script_11, script_12, script_13, script_14)
     }
@@ -65,23 +98,22 @@ class BaseSpec extends AsyncFlatSpec with Matchers with BeforeAndAfterAll {
         if (null != graph) {
             graph.close()
         }
-        if(null != session && !session.isClosed)
+        if (null != session && !session.isClosed)
             session.close()
-        EmbeddedCassandraServerHelper.cleanEmbeddedCassandra()
+        // Container is a singleton managed by Testcontainers' Ryuk reaper — do not stop it here.
     }
 
-
     def executeCassandraQuery(queries: String*): Unit = {
-        if(null == session || session.isClosed){
+        if (null == session || session.isClosed) {
             session = CassandraConnector.getSession
         }
-        for(query <- queries) {
+        for (query <- queries) {
             session.execute(query)
         }
     }
 
     def createVertex(label: String, properties: Map[String, AnyRef]): Unit = {
-        val vertex = graph.asInstanceOf[org.janusgraph.core.JanusGraphTransaction].addVertex(org.apache.tinkerpop.gremlin.structure.T.label, label)
+        val vertex = graph.addVertex(org.apache.tinkerpop.gremlin.structure.T.label, label)
         properties.foreach { case (k, v) => vertex.property(k, v) }
     }
 
@@ -91,10 +123,10 @@ class BaseSpec extends AsyncFlatSpec with Matchers with BeforeAndAfterAll {
         graph.tx().commit()
     }
 
-	def createBulkNodes(): Unit ={
+    def createBulkNodes(): Unit = {
         createVertex("domain", Map[String, AnyRef]("IL_UNIQUE_ID" -> "do_0000123", "identifier" -> "do_0000123", "graphId" -> "domain"))
         createVertex("domain", Map[String, AnyRef]("IL_UNIQUE_ID" -> "do_0000234", "identifier" -> "do_0000234", "graphId" -> "domain"))
         createVertex("domain", Map[String, AnyRef]("IL_UNIQUE_ID" -> "do_0000345", "identifier" -> "do_0000345", "graphId" -> "domain"))
-		graph.tx().commit()
-	}
+        graph.tx().commit()
+    }
 }
