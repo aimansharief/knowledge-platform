@@ -58,6 +58,19 @@ CREATE  {service}/{actors}/src/test/scala/.../actors/{Name}ActorTest.scala
 - Methods used: `getNodeAsObject`, `addNode`, `addRelation`, `search`
 - Error handling: `Option`/`Either`/`Try`
 
+### Non-Functional Requirements
+| Concern | Target |
+|---------|--------|
+| Latency | (e.g. p99 < 500ms) |
+| Throughput | (e.g. expected req/s) |
+| Availability | (e.g. 99.9%) |
+| Rollout safety | (zero-downtime? needs feature flag?) |
+
+### Trade-offs
+- **Why this approach**: (one line)
+- **Main risk**: (what could go wrong)
+- **Alternative rejected**: (what else was considered and why not)
+
 ### Test Plan
 - Test class: `{Name}ActorTest.scala` extending `BaseSpec`
 - Mocks: `OntologyEngineContext`, `GraphService`

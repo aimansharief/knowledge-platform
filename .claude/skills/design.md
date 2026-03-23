@@ -47,11 +47,35 @@ Identify which service's `conf/routes` file to update.
 - Relationships to other node types
 - Schema file location: `schemas/{nodeType}/schema.json` (if applicable)
 
-### 5. Configuration
+### 5. Non-Functional Requirements
+| Concern | Target |
+|---------|--------|
+| Latency | e.g. p99 < 500ms |
+| Throughput | e.g. expected req/s |
+| Availability | e.g. 99.9% |
+| Data consistency | e.g. eventual / strong |
+| Security boundary | e.g. internal-only / public API |
+
+### 6. Trade-offs
+**Why this approach:**
+- (reason this design fits KP patterns)
+
+**Alternatives considered:**
+- (alternative 1 and why rejected)
+
+**Risks:**
+- (what could go wrong or be hard to change later)
+
+### 7. Configuration
 - Any new keys needed in `conf/application.conf`
 - Feature flags (if applicable)
 
-### 6. Test Plan
+### 8. Operations
+- **Deployment**: services to redeploy, migration steps if any
+- **Monitoring**: key log lines or metrics to watch post-release
+- **Rollback**: how to revert without data loss
+
+### 9. Test Plan
 - Test class: `{Name}ActorTest.scala`
 - Extends: `BaseSpec`
 - Mocks: `OntologyEngineContext`, `GraphService`
@@ -62,12 +86,12 @@ Identify which service's `conf/routes` file to update.
   - Missing node
 - Coverage target: 80%+ on actor logic
 
-### 7. Module Placement
+### 10. Module Placement
 Which Maven module(s) are affected:
 - New files go in: `{module}/src/main/scala/...`
 - pom.xml changes needed: yes/no and why
 
-### 8. Open Questions
+### 11. Open Questions
 List any ambiguities that need clarification before implementation starts.
 
 ---

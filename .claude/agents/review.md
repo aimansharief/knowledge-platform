@@ -70,6 +70,7 @@ Finish with a **Summary** line: overall verdict (Approved / Needs Changes / Bloc
 - `OntologyEngineContext` passed through actor messages, not stored as actor state
 - Async graph calls handled with `Future`/`map`/`flatMap` — not blocked with `Await`
 - Graph failures handled with `Option`/`Either` patterns
+- No N+1 graph traversals — related nodes fetched in batch, not in a loop
 
 ### Error Handling & Logging
 - Errors logged at `ERROR` level with request context (requestId, nodeId, etc.)
@@ -84,6 +85,13 @@ Finish with a **Summary** line: overall verdict (Approved / Needs Changes / Bloc
 - Network-dependent tests use `ignore should` (not `it should`) — see agent memory
 - Test names are descriptive: `"should create node when valid input provided"`
 - Aim for 80%+ line coverage on actor logic
+
+### System Behavior (AI-First Priority)
+Review for system-level correctness first — style issues are secondary:
+- **Behavior regressions**: Does this change alter the behavior of any existing actor message handler or API response shape?
+- **Data integrity**: Are graph writes atomic where needed? Could a partial failure leave nodes in an inconsistent state?
+- **Failure handling**: Is every async boundary (graph call, Cassandra, Redis, Kafka) handling failure explicitly?
+- **Rollout safety**: Can this be deployed without downtime? Does it require a data migration or feature flag?
 
 ### Security
 - No command injection risks in any shell calls
