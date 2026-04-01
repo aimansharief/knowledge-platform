@@ -270,7 +270,7 @@ public class GraphAsyncOperations {
 			nodeMap.put(nodeId, node);
 
 			if (depth > 0) {
-				Iterator<JanusGraphEdge> edges = JanusGraphNodeUtil.getEdges(vertex, "BOTH");
+				Iterator<JanusGraphEdge> edges = JanusGraphNodeUtil.getEdges(vertex, "OUT");
 				while (edges.hasNext()) {
 					JanusGraphEdge edge = edges.next();
 					JanusGraphVertex otherV = edge.inVertex().id().equals(vertex.id()) ? edge.outVertex()
