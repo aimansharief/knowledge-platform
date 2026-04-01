@@ -28,7 +28,7 @@ public class CassandraConnector {
 	private static final AtomicBoolean        shutdownHookRegistered = new AtomicBoolean(false);
 
 	/** Maximum number of connection attempts made at JVM startup. */
-	private static final int  MAX_STARTUP_RETRIES = 30;
+	private static final int  MAX_STARTUP_RETRIES = Platform.getInteger("cassandra.max.startup.retries", 30);
 	/** Initial retry wait (doubles each attempt, capped at RETRY_MAX_MS). */
 	private static final long RETRY_BASE_MS       = 2_000L;
 	/** Ceiling for the retry wait interval. */
@@ -72,6 +72,8 @@ public class CassandraConnector {
 				} catch (Exception e) {
 					TelemetryManager.error("Cassandra reconnect failed for [" + key + "]: "
 							+ e.getMessage(), e);
+					throw new ServerException("ERR_INITIALISE_CASSANDRA_SESSION",
+							"Cassandra reconnect failed for [" + key + "]: " + e.getMessage(), e);
 				}
 				session = sessionMap.get(key);
 			}
@@ -88,7 +90,7 @@ public class CassandraConnector {
 	 * and driver-internal background threads. Each cluster is closed independently
 	 * so a failure in one does not block the others.
 	 */
-	public static void close() {
+	public static synchronized void close() {
 		clusterMap.forEach((key, cluster) -> {
 			if (cluster != null && !cluster.isClosed()) {
 				try {
@@ -139,8 +141,9 @@ public class CassandraConnector {
 				}
 			}
 		}
-		TelemetryManager.error("All " + MAX_STARTUP_RETRIES
-				+ " Cassandra startup connect attempts exhausted for [" + sessionKey + "]");
+		throw new ServerException("ERR_INITIALISE_CASSANDRA_SESSION",
+				"All " + MAX_STARTUP_RETRIES
+						+ " Cassandra startup connect attempts exhausted for [" + sessionKey + "]");
 	}
 
 
@@ -164,12 +167,13 @@ public class CassandraConnector {
 		Cluster cluster = builder.build();
 		Session session = cluster.connect();
 
-		Cluster oldCluster = clusterMap.put(sessionKey, cluster);
-		sessionMap.put(sessionKey, session);
-
+		Cluster oldCluster = clusterMap.get(sessionKey);
 		if (oldCluster != null && !oldCluster.isClosed()) {
 			try { oldCluster.close(); } catch (Exception ignored) { /* best effort */ }
 		}
+
+		clusterMap.put(sessionKey, cluster);
+		sessionMap.put(sessionKey, session);
 
 		if (shutdownHookRegistered.compareAndSet(false, true))
 			registerShutdownHook();
@@ -202,7 +206,9 @@ public class CassandraConnector {
 		List<InetSocketAddress> list = new ArrayList<>();
 		for (String conn : hosts) {
 			String[] parts = conn.trim().split(":");
-			list.add(new InetSocketAddress(parts[0].trim(), Integer.parseInt(parts[1].trim())));
+			String host = parts[0].trim();
+			int port = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : 9042;
+			list.add(new InetSocketAddress(host, port));
 		}
 		return list;
 	}
