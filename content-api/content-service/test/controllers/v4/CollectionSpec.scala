@@ -111,6 +111,13 @@ class CollectionSpec extends BaseSpec {
             isOK(result)
             status(result) must equalTo(OK)
         }
+
+        "return success response for updateHierarchyRelationships API" in {
+            val controller = app.injector.instanceOf[CollectionController]
+            val result = controller.updateHierarchyRelationships("do_123")(FakeRequest())
+            isOK(result)
+            status(result) must equalTo(OK)
+        }
     }
 
     "return success response for hierarchy update API" in {
