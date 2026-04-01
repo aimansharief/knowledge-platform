@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 
 public class CassandraConnector {
@@ -133,9 +134,8 @@ public class CassandraConnector {
 						Thread.sleep(sleep);
 					} catch (InterruptedException ie) {
 						Thread.currentThread().interrupt();
-						TelemetryManager.error(
-								"Cassandra startup retry interrupted for [" + sessionKey + "]", ie);
-						return;
+						throw new ServerException("ERR_INITIALISE_CASSANDRA_SESSION",
+								"Cassandra startup retry interrupted for [" + sessionKey + "]");
 					}
 					cap = Math.min(cap * 2, RETRY_MAX_MS);
 				}
@@ -165,7 +165,13 @@ public class CassandraConnector {
 			builder.withQueryOptions(new QueryOptions().setConsistencyLevel(level));
 
 		Cluster cluster = builder.build();
-		Session session = cluster.connect();
+		Session session;
+		try {
+			session = cluster.connect();
+		} catch (Exception e) {
+			cluster.close();
+			throw e;
+		}
 
 		Cluster oldCluster = clusterMap.get(sessionKey);
 		if (oldCluster != null && !oldCluster.isClosed()) {
@@ -196,7 +202,10 @@ public class CassandraConnector {
 			default:                 configKey = null;                                     break;
 		}
 		if (configKey != null && Platform.config.hasPath(configKey)) {
-			List<String> nodes = Arrays.asList(Platform.config.getString(configKey).split(","));
+			List<String> nodes = Arrays.stream(Platform.config.getString(configKey).split(","))
+					.map(String::trim)
+					.filter(s -> !s.isEmpty())
+					.collect(Collectors.toList());
 			if (!nodes.isEmpty()) return nodes;
 		}
 		return new ArrayList<>(Collections.singletonList("localhost:9042"));

@@ -177,11 +177,11 @@ public abstract class CassandraStore {
 	}
 
 	protected void upsertRecord(Map<String, Object> request) {
+		if (null == request || request.isEmpty()) {
+			throw new ServerException(CassandraParams.ERR_SERVER_ERROR.name(),
+					"Invalid request to upsert.");
+		}
 		try {
-			if (null == request || request.isEmpty()) {
-				throw new ServerException(CassandraParams.ERR_SERVER_ERROR.name(),
-						"Invalid request to upsert.");
-			}
 			Session session = CassandraConnector.getSession();
 			String query = getPreparedStatementFrUpsert(request);
 			PreparedStatement statement = session.prepare(query);
