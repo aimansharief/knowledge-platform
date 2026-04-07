@@ -9,16 +9,14 @@ Play Framework APIs for the Sunbird Knowledge Platform. Each service exposes RES
 1. [Modules](#modules)
 2. [Prerequisites](#prerequisites)
 3. [Local Development Setup](#local-development-setup)
-   - [Start all services](#start-all-services)
-   - [Initialize YugabyteDB keyspaces](#initialize-yugabytedb-keyspaces)
-   - [Redis (optional)](#redis-optional)
-   - [Verify services](#verify-services)
-4. [Building the Project](#building-the-project)
-5. [Running a Service Locally](#running-a-service-locally)
-   - [Option A — Run an individual service](#option-a--run-an-individual-service)
-   - [Option B — Run Content, Taxonomy, and Assessment together](#option-b--run-content-taxonomy-and-assessment-together)
-6. [Cloud Storage Configuration](#cloud-storage-configuration)
-7. [CI/CD — GitHub Actions](#cicd--github-actions)
+   - [Step 1 — Clone the repository](#step-1--clone-the-repository)
+   - [Step 2 — Start infrastructure](#step-2--start-infrastructure)
+   - [Step 3 — Initialize YugabyteDB keyspaces](#step-3--initialize-yugabytedb-keyspaces)
+   - [Step 4 — Build the project](#step-4--build-the-project)
+   - [Step 5 — Run a service](#step-5--run-a-service)
+4. [Redis (optional)](#redis-optional)
+5. [Cloud Storage Configuration](#cloud-storage-configuration)
+6. [CI/CD — GitHub Actions](#cicd--github-actions)
 
 ---
 
@@ -43,94 +41,80 @@ Make sure these are installed before you begin:
 
 - **Java 11** — verify with `java -version`
 - **Maven 3.9+** — verify with `mvn -version`
-- **Docker** — verify with `docker --version`
+- **Docker Desktop** — verify with `docker --version`
+  - Allocate at least **6 GB RAM** to Docker Desktop (Settings > Resources > Memory). The default 3.8 GB is not enough — JanusGraph will get OOM-killed.
+- **Git** — verify with `git --version`
 
 ---
 
 ## Local Development Setup
 
-All services are defined in `docker/docker-compose.yml`.
+Follow these steps in order. The full setup takes about 5 minutes.
 
-### Start all services
+### Step 1 — Clone the repository
+
+```shell
+git clone https://github.com/Sunbird-Knowlg/knowledge-platform.git
+cd knowledge-platform
+```
+
+### Step 2 — Start infrastructure
 
 ```shell
 cd docker
 docker compose up -d
 ```
 
-This starts YugabyteDB, JanusGraph, Elasticsearch, and Kafka. JanusGraph automatically initializes the graph schema on startup via `docker/janusgraph/scripts/schema_init.groovy`.
+This starts **YugabyteDB**, **JanusGraph**, **Elasticsearch**, and **Kafka**.
 
-Verify JanusGraph schema was initialized:
+Wait about **90 seconds** for everything to initialize (YugabyteDB starts first, then JanusGraph connects to it and creates the graph schema). You can check progress with:
+
 ```shell
+docker compose ps                  # all containers should show "Up"
 docker logs janusgraph | grep "SCHEMA INITIALIZATION"
 # Expected: --- SCHEMA INITIALIZATION COMPLETE ---
 ```
 
-### Initialize YugabyteDB keyspaces
+### Step 3 — Initialize YugabyteDB keyspaces
 
-Once YugabyteDB is up, run the CQL migration script to create the required keyspaces and tables. This downloads the migration files from [sunbird-spark-installer](https://github.com/Sunbird-Spark/sunbird-spark-installer/tree/develop/scripts/sunbird-yugabyte-migrations/sunbird-knowlg) and executes them against the local YugabyteDB container.
+Still inside the `docker/` directory, run the migration script to create the required keyspaces and tables:
 
 ```shell
-./init-yugabyte.sh              # env=dev, branch=develop
-./init-yugabyte.sh sb           # env=sb, branch=develop
-./init-yugabyte.sh dev main     # env=dev, branch=main
+./init-yugabyte.sh
 ```
 
-This only needs to be run once (or after `docker compose down -v` which deletes volumes).
-
-### Redis (optional)
-
-Redis is disabled by default. All service `application.conf` files ship with `redis.enable = false`, so the services read directly from the graph database. To enable Redis caching:
-
-1. Start Redis:
-   ```shell
-   docker compose --profile redis up -d
-   ```
-
-2. Set `redis.enable = true` in the `application.conf` of the service you are running.
-
-### Verify services
-
-| Service | URL |
-|---------|-----|
-| YugabyteDB YCQL | localhost:9042 |
-| JanusGraph (Gremlin) | ws://localhost:8182/gremlin |
-| Elasticsearch | localhost:9200 |
-| Kafka | localhost:9092 |
-
-### Stop / Reset
+This downloads CQL migration files from [sunbird-spark-installer](https://github.com/Sunbird-Spark/sunbird-spark-installer/tree/develop/scripts/sunbird-yugabyte-migrations/sunbird-knowlg) and executes them. By default it uses `dev` as the keyspace prefix (e.g. `dev_content_store`) and the `develop` branch.
 
 ```shell
-cd docker
-docker compose down            # stop containers, keep data
-docker compose down -v         # stop containers and delete volumes
+./init-yugabyte.sh sb           # use 'sb' as keyspace prefix instead
+./init-yugabyte.sh dev main     # use a different branch
 ```
 
----
+You only need to run this once. Run it again after `docker compose down -v` (which deletes volumes).
 
-## Building the Project
+### Step 4 — Build the project
 
-From the repository root:
+Go back to the repository root and build:
 
 ```shell
-# Default build (Azure)
+cd ..
 mvn clean install -DskipTests
-
-# Build for specific Cloud Provider
-mvn clean install -DskipTests -Paws   # For AWS S3
-mvn clean install -DskipTests -Pgcp   # For Google Cloud Storage
-mvn clean install -DskipTests -Poci   # For Oracle Cloud Infrastructure
 ```
 
-A successful build ends with `BUILD SUCCESS`.
+This takes a few minutes the first time (Maven downloads dependencies). A successful build ends with `BUILD SUCCESS`.
 
----
+To build for a specific cloud provider:
+```shell
+mvn clean install -DskipTests -Paws   # AWS S3
+mvn clean install -DskipTests -Pgcp   # Google Cloud Storage
+mvn clean install -DskipTests -Poci   # Oracle Cloud Infrastructure
+```
 
-## Running a Service Locally
+### Step 5 — Run a service
 
 You can either run services individually or run Content, Taxonomy, and Assessment together via `knowlg-service`.
 
-### Option A — Run an individual service
+#### Option A — Run an individual service
 
 | Service | Module Path | Default Port |
 |---------|-------------|--------------|
@@ -139,89 +123,112 @@ You can either run services individually or run Content, Taxonomy, and Assessmen
 | **Taxonomy Service** | `taxonomy-api/taxonomy-service` | 9000 |
 | **Assessment Service** | `assessment-api/assessment-service` | 9000 |
 
-1. Make sure all containers from [Local Development Setup](#local-development-setup) are running.
+Example — running Taxonomy Service:
 
-2. Set the [cloud storage environment variables](#cloud-storage-configuration).
+**Linux:**
+```shell
+cd taxonomy-api/taxonomy-service
+mvn play2:run
+```
 
-3. Run the service. Example for Taxonomy Service:
+**macOS:**
+```shell
+cd taxonomy-api/taxonomy-service
+mvn play2:dist
+cd target
+tar xvzf taxonomy-service-1.0-SNAPSHOT-dist.zip
+cd taxonomy-service-1.0-SNAPSHOT
+./start
+```
 
-   **Linux:**
-   ```shell
-   cd taxonomy-api/taxonomy-service
-   mvn play2:run
-   ```
-
-   **macOS:**
-   ```shell
-   cd taxonomy-api/taxonomy-service
-   mvn play2:dist
-   cd target
-   tar xvzf taxonomy-service-1.0-SNAPSHOT-dist.zip
-   cd taxonomy-service-1.0-SNAPSHOT
-   ./start
-   ```
-
-4. Health check:
-   ```shell
-   curl http://localhost:9000/health
-   ```
-
-### Option B — Run Content, Taxonomy, and Assessment together
+#### Option B — Run Content, Taxonomy, and Assessment together
 
 The `knowlg-service` module bundles Content, Taxonomy, and Assessment into a single Play application.
 
-1. Make sure all containers from [Local Development Setup](#local-development-setup) are running.
+**Linux:**
+```shell
+cd knowlg-service
+mvn play2:run
+```
 
-2. Set the [cloud storage environment variables](#cloud-storage-configuration).
+**macOS:**
+```shell
+cd knowlg-service
+mvn play2:dist
+cd target
+tar xvzf knowlg-service-1.0-SNAPSHOT-dist.zip
+cd knowlg-service-1.0-SNAPSHOT
+./start
+```
 
-3. Build and run:
+#### Verify it works
 
-   **Linux:**
+```shell
+curl http://localhost:9000/health
+```
+
+You should get a `200 OK` response.
+
+---
+
+### Stopping and resetting
+
+```shell
+cd docker
+docker compose down            # stop containers, keep data
+docker compose down -v         # stop containers and delete all data
+```
+
+---
+
+## Redis (optional)
+
+Redis is disabled by default. All service `application.conf` files ship with `redis.enable = false`, so the services read directly from the graph database.
+
+To enable Redis caching:
+
+1. Start Redis:
    ```shell
-   cd knowlg-service
-   mvn play2:run
+   cd docker
+   docker compose --profile redis up -d
    ```
 
-   **macOS:**
-   ```shell
-   cd knowlg-service
-   mvn play2:dist
-   cd target
-   tar xvzf knowlg-service-1.0-SNAPSHOT-dist.zip
-   cd knowlg-service-1.0-SNAPSHOT
-   ./start
-   ```
-
-4. Health check:
-   ```shell
-   curl http://localhost:9000/health
-   ```
+2. Set `redis.enable = true` in the `application.conf` of the service you are running.
 
 ---
 
 ## Cloud Storage Configuration
 
-Set these environment variables before running any service locally:
+Cloud storage is needed for uploading/downloading content artifacts. If you are only testing APIs that don't involve file uploads, you can skip this.
 
+Set these environment variables before running a service:
+
+#### Azure (default)
 ```shell
-export cloud_storage_type=            # azure | aws | gcloud
+export cloud_storage_type=azure
 export cloud_storage_auth_type=ACCESS_KEY
+export cloud_storage_key=your-account-name
+export cloud_storage_secret=your-account-key
+export cloud_storage_container=your-container-name
+```
 
-# Azure (default)
-export cloud_storage_key=             # account name
-export cloud_storage_secret=          # account key
-export cloud_storage_container=       # container name
+#### AWS S3
+```shell
+export cloud_storage_type=aws
+export cloud_storage_auth_type=ACCESS_KEY
+export cloud_storage_key=your-access-key-id
+export cloud_storage_secret=your-secret-access-key
+export cloud_storage_region=ap-south-1
+export cloud_storage_container=your-s3-bucket-name
+```
 
-# AWS
-export cloud_storage_key=             # access key ID
-export cloud_storage_secret=          # secret access key
-export cloud_storage_region=          # e.g. ap-south-1
-export cloud_storage_container=       # S3 bucket name
-
-# GCP
-export cloud_storage_key=             # service account client email
-export cloud_storage_secret=          # path to JSON key file
-export cloud_storage_container=       # GCS bucket name
+#### Google Cloud Storage
+```shell
+export cloud_storage_type=gcloud
+export cloud_storage_auth_type=ACCESS_KEY
+export cloud_storage_key=your-client-email
+export cloud_storage_secret=/path/to/key.json
+export cloud_storage_container=your-gcs-bucket-name
 ```
 
 ---
