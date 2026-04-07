@@ -65,11 +65,14 @@ docker logs janusgraph | grep "SCHEMA INITIALIZATION"
 
 ### Redis (optional)
 
-Redis is disabled by default. Only start it if the service you are running requires caching.
+Redis is disabled by default. All service `application.conf` files ship with `redis.enable = false`, so the services read directly from the graph database. To enable Redis caching:
 
-```shell
-docker compose --profile redis up -d
-```
+1. Start Redis:
+   ```shell
+   docker compose --profile redis up -d
+   ```
+
+2. Set `redis.enable = true` in the `application.conf` of the service you are running.
 
 ### Verify services
 
