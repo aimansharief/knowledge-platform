@@ -1,248 +1,211 @@
-# knowledge-platform
+# Knowledge Platform
 
-Repository for Knowledge Platform - 2.0
+Play Framework APIs for the Sunbird Knowledge Platform. Each service exposes REST endpoints for managing content, taxonomy, search, and assessments, backed by JanusGraph, YugabyteDB, Elasticsearch, and Redis.
 
-## Knowledge-platform local setup 
-This readme file contains the instruction to set up and run the content-service in local machine.
+---
 
-### System Requirements:
+## Table of Contents
 
-### Prerequisites:
-* Java 11
-* Docker, Docker Compose
+1. [Modules](#modules)
+2. [Prerequisites](#prerequisites)
+3. [Local Development Setup](#local-development-setup)
+   - [Start all services](#start-all-services)
+   - [Redis (optional)](#redis-optional)
+   - [Verify services](#verify-services)
+4. [Building the Project](#building-the-project)
+5. [Running a Service Locally](#running-a-service-locally)
+6. [Cloud Storage Configuration](#cloud-storage-configuration)
+7. [CI/CD — GitHub Actions](#cicd--github-actions)
 
+---
 
-## One step installation 
+## Modules
 
-1. Go to Root folder (knowledge-platform)
-2. Run "local-setup.sh" file
-``` shell
-sh ./local-setup.sh
-```
- 
- This will install all the requied dcoker images & local folders for DB mounting.
- 3. Follow the below manual setps of running content service 
-  refer: [Running Content Service:](#running-content-service)
+| Module | Description |
+|--------|-------------|
+| `platform-core` | Shared libraries: graph engine, schema validators, actors, cloud storage |
+| `ontology-engine` | Graph operations for content, taxonomy, and assessment nodes |
+| `content-api/content-service` | Content and collection CRUD, hierarchy, publishing triggers |
+| `taxonomy-api/taxonomy-service` | Frameworks, categories, terms, channels, licenses |
+| `search-api/search-service` | Composite search across the knowledge graph via Elasticsearch |
+| `assessment-api/assessment-service` | QuestionSets and assessment items |
 
+---
 
+## Prerequisites
 
-## Manual steps to install all the dependents
-Please follow the manual steps in [One step installation](#one-step-installation) is failed.
+Make sure these are installed before you begin:
 
-### Prepare folders for database data and logs
+- **Java 11** — verify with `java -version`
+- **Maven 3.9+** — verify with `mvn -version`
+- **Docker** — verify with `docker --version`
+
+---
+
+## Local Development Setup
+
+All services are defined in `docker/docker-compose.yml`.
+
+### Start all services
 
 ```shell
-mkdir -p ~/sunbird-dbs/neo4j ~/sunbird-dbs/cassandra ~/sunbird-dbs/redis ~/sunbird-dbs/es ~/sunbird-dbs/kafka
-export sunbird_dbs_path=~/sunbird-dbs
+cd docker
+docker compose up -d
 ```
 
-### Neo4j database setup in docker:
-1. First, we need to get the neo4j image from docker hub using the following command.
-```shell
-docker pull neo4j:3.3.0 
-```
-2. We need to create the neo4j instance, By using the below command we can create the same and run in a container.
-```shell
-docker run --name sunbird_neo4j -p7474:7474 -p7687:7687 -d \
-    -v $sunbird_dbs_path/neo4j/data:/var/lib/neo4j/data \
--v $sunbird_dbs_path/neo4j/logs:/var/lib/neo4j/logs \
--v $sunbird_dbs_path/neo4j/plugins:/var/lib/neo4j/plugins \
---env NEO4J_dbms_connector_https_advertised__address="localhost:7473" \
---env NEO4J_dbms_connector_http_advertised__address="localhost:7474" \
---env NEO4J_dbms_connector_bolt_advertised__address="localhost:7687" \
---env NEO4J_AUTH=none \
-neo4j:3.3.0
-```
-> --name -  Name your container (avoids generic id)
-> 
-> -p - Specify container ports to expose
-> 
-> Using the -p option with ports 7474 and 7687 allows us to expose and listen for traffic on both the HTTP and Bolt ports. Having the HTTP port means we can connect to our database with Neo4j Browser, and the Bolt port means efficient and type-safe communication requests between other layers and the database.
-> 
-> -d - This detaches the container to run in the background, meaning we can access the container separately and see into all of its processes.
-> 
-> -v - The next several lines start with the -v option. These lines define volumes we want to bind in our local directory structure so we can access certain files locally.
-> 
-> --env - Set config as environment variables for Neo4j database
->
-> Using Docker on Windows will also need a couple of additional configurations because the default 0.0.0.0 address that is resolved with the above command does not translate to localhost in Windows. We need to add environment variables to our command above to set the advertised addresses.
-> 
-> By default, Neo4j requires authentication and requires us to first login with neo4j/neo4j and set a new password. We will skip this password reset by initializing the authentication none when we create the Docker container using the --env NEO4J_AUTH=none.
+This starts YugabyteDB, JanusGraph, Elasticsearch, and Kafka. JanusGraph automatically initializes the schema on startup via `docker/janusgraph/scripts/schema_init.groovy`.
 
-3. Load seed data to neo4j using the instructions provided in the [link](master-data/loading-seed-data.md#loading-seed-data-to-neo4j-database)
-
-4. Verify whether neo4j is running or not by accessing neo4j browser(http://localhost:7474/browser).
-
-5. To SSH to neo4j docker container, run the below command.
+Verify JanusGraph schema was initialized:
 ```shell
-docker exec -it sunbird_neo4j bash
+docker logs janusgraph | grep "SCHEMA INITIALIZATION"
+# Expected: --- SCHEMA INITIALIZATION COMPLETE ---
 ```
 
-### Redis database setup in docker:
-1. we need to get the redis image from docker hub using the below command.
-```shell
-docker pull redis:6.0.8 
-```
-2. We need to create the redis instance, By using the below command we can create the same and run in a container.
-```shell
-docker run --name sunbird_redis -d -p 6379:6379 redis:6.0.8
-```
-3. To SSH to redis docker container, run the below command
-```shell
-docker exec -it sunbird_redis bash
-```
-### cassandra database setup in docker:
-1. we need to get the cassandra image and can be done using the below command.
-```shell
-docker pull cassandra:3.11.8 
-```
-2. We need to create the cassandra instance, By using the below command we can create the same and run in a container.
-```shell
-docker run --name sunbird_cassandra -d -p 9042:9042 \
--v $sunbird_dbs_path/cassandra/data:/var/lib/cassandra \
--v $sunbird_dbs_path/cassandra/logs:/opt/cassandra/logs \
--v $sunbird_dbs_path/cassandra/backups:/mnt/backups \
---network bridge cassandra:3.11.8 
-```
-For network, we can use the existing network or create a new network using the following command and use it.
-```shell
-docker network create sunbird_db_network
-```
-3. To start cassandra cypher shell run the below command.
-```shell
-docker exec -it sunbird_cassandra cqlsh
-```
-4. To ssh to cassandra docker container, run the below command.
-```shell
-docker exec -it sunbird_cassandra /bin/bash
-```
-5. Load seed data to cassandra using the instructions provided in the [link](master-data/loading-seed-data.md#loading-seed-data-to-cassandra-database)
+### Redis (optional)
 
-### Running kafka using docker:
-1. Kafka stores information about the cluster and consumers into Zookeeper. ZooKeeper acts as a coordinator between them. we need to run two services(zookeeper & kafka), Prepare your docker-compose.yml file using the following reference.
-```shell
-version: '3'
+Redis is disabled by default. Only start it if the service you are running requires caching.
 
-services:
-  zookeeper:
-    image: 'wurstmeister/zookeeper:latest'
-    container_name: zookeeper
-    ports:
-      - "2181:2181"    
-    environment:
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:2181     
-    
-  kafka:
-    image: 'wurstmeister/kafka:2.12-1.0.1'
-    container_name: kafka
-    ports:
-      - "9092:9092"
-    environment:
-      - KAFKA_BROKER_ID=1
-      - KAFKA_LISTENERS=PLAINTEXT://:9092
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181      
-      - ALLOW_PLAINTEXT_LISTENER=yes
-    depends_on:
-      - zookeeper  
-```
-2. Go to the path where docker-compose.yml placed and run the below command to create and run the containers (zookeeper & kafka).
 ```shell
-docker-compose -f docker-compose.yml up -d
-```
-3. To start kafka docker container shell, run the below command.
-```shell
-docker exec -it kafka sh
-```
-Go to path /opt/kafka/bin, where we will have executable files to perform operations(creating topics, running producers and consumers, etc).
-Example:
-```shell
-kafka-topics.sh --create --zookeeper zookeeper:2181 --replication-factor 1 --partitions 1 --topic test_topic 
+docker compose --profile redis up -d
 ```
 
-### Running Content Service:
+### Verify services
 
-### (Content V3+V4 APIs, Collection V4 APIs, Assets V4 APIs, Channel V3 APIs, License V3 APIs, Event V4 APIs, EventSet V4 APIs)
+| Service | URL |
+|---------|-----|
+| YugabyteDB YCQL | localhost:9042 |
+| JanusGraph (Gremlin) | ws://localhost:8182/gremlin |
+| Elasticsearch | localhost:9200 |
+| Kafka | localhost:9092 |
 
-1. Go to the path: /knowledge-platform and run the below maven command to build the application.
+### Stop / Reset
+
 ```shell
+cd docker
+docker compose down            # stop containers, keep data
+docker compose down -v         # stop containers and delete volumes
+```
+
+---
+
+## Building the Project
+
+From the repository root:
+
+```shell
+# Default build (Azure)
 mvn clean install -DskipTests
+
+# Build for specific Cloud Provider
+mvn clean install -DskipTests -Paws   # For AWS S3
+mvn clean install -DskipTests -Pgcp   # For Google Cloud Storage
+mvn clean install -DskipTests -Poci   # For Oracle Cloud Infrastructure
 ```
-2. Go to the path: /knowledge-platform/content-api/content-service and run the below maven command to run the netty server.
+
+A successful build ends with `BUILD SUCCESS`.
+
+---
+
+## Running a Service Locally
+
+Each service runs as a standalone Play application using `play2:run`.
+
+| Service | Module Path | Default Port |
+|---------|-------------|--------------|
+| **Content Service** | `content-api/content-service` | 9000 |
+| **Search Service** | `search-api/search-service` | 9000 |
+| **Taxonomy Service** | `taxonomy-api/taxonomy-service` | 9000 |
+| **Assessment Service** | `assessment-api/assessment-service` | 9000 |
+
+1. Make sure all containers from [Local Development Setup](#local-development-setup) are running.
+
+2. Set the [cloud storage environment variables](#cloud-storage-configuration).
+
+3. Run the service. Example for Content Service:
+   ```shell
+   cd content-api/content-service
+   mvn play2:run
+   ```
+
+4. Health check:
+   ```shell
+   curl http://localhost:9000/health
+   ```
+
+---
+
+## Cloud Storage Configuration
+
+Set these environment variables before running any service locally:
+
 ```shell
-mvn play2:run
-```
-3. Using the below command we can verify whether the databases(neo4j,redis & cassandra) connection is established or not. If all connections are good, health is shown as 'true' otherwise it will be 'false'.
-```shell
-curl http://localhost:9000/health
-```
+export cloud_storage_type=            # azure | aws | gcloud
+export cloud_storage_auth_type=ACCESS_KEY
 
-### Running Assets/Composite Search Service:
-1. Go to the path: /knowledge-platform and run the below maven command to build the application.
-```shell
-mvn clean install -DskipTests
-```
-2. Go to the path: /knowledge-platform/search-api/search-service and run the below maven command to run the netty server.
-```shell
-mvn play2:run
-```
-3. Using the below command we can verify whether the databases(neo4j,redis & cassandra) connection is established or not. If all connections are good, health is shown as 'true' otherwise it will be 'false'.
-```shell
-curl http://localhost:9000/health
-```
+# Azure (default)
+export cloud_storage_key=             # account name
+export cloud_storage_secret=          # account key
+export cloud_storage_container=       # container name
 
-### Running Object Category Service:
-1. Go to the path: /knowledge-platform and run the below maven command to build the application.
-```shell
-mvn clean install -DskipTests
-```
-2. Go to the path: /knowledge-platform/taxonomy-api/taxonomy-service and run the below maven command to run the netty server.
-```shell
-mvn play2:run
-```
-3. Using the below command we can verify whether the databases(neo4j,redis & cassandra) connection is established or not. If all connections are good, health is shown as 'true' otherwise it will be 'false'.
-```shell
-curl http://localhost:9000/health
+# AWS
+export cloud_storage_key=             # access key ID
+export cloud_storage_secret=          # secret access key
+export cloud_storage_region=          # e.g. ap-south-1
+export cloud_storage_container=       # S3 bucket name
+
+# GCP
+export cloud_storage_key=             # service account client email
+export cloud_storage_secret=          # path to JSON key file
+export cloud_storage_container=       # GCS bucket name
 ```
 
-### GitHub Actions Workflow Prerequisites
+---
 
-To ensure the GitHub Actions workflows in this repository function correctly, the following prerequisites must be met:
+## CI/CD — GitHub Actions
 
-1. **Secrets Configuration**:
-   - Ensure the secrets are configured in your GitHub repository, depending on the value of `REGISTRY_PROVIDER`. The workflow will push the image to the respective container registry if the required credentials are provided.
+The project uses **GitHub Actions** for CI/CD. Workflows are defined in `.github/workflows/` and triggered on tag push.
 
-   - Note: If No REGISTRY_PROVIDER is provided the image will be pushed to GHCR.
+### Required variables (Settings > Secrets and variables > Actions)
 
-    #### GCP (Google Cloud Platform)
-    - `REGISTRY_PROVIDER`: Set to `gcp`
-    - `GCP_SERVICE_ACCOUNT_KEY`: Base64-encoded service account key for GCP.
-    - `REGISTRY_NAME`: GCP registry name (e.g., `asia-south1-docker.pkg.dev`).
-    - `REGISTRY_URL`: URL of the GCP container registry (e.g., `asia-south1-docker.pkg.dev/<project_id>/<repository_name>`).
+| Variable | Description |
+|----------|-------------|
+| `REGISTRY_PROVIDER` | Registry type: `gcp`, `dockerhub`, `azure`, `aws`, or `ghcr` |
+| `REGISTRY_URL` | Container registry URL |
+| `CLOUD_STORE_GROUP_ID` | Cloud storage SDK group ID |
+| `ARTIFACT_ID` | Cloud storage SDK artifact ID |
+| `VERSION` | Cloud storage SDK version |
 
-    #### DockerHub
-    - `REGISTRY_PROVIDER`: Set to `dockerhub`
-    - `REGISTRY_USERNAME`: DockerHub username.
-    - `REGISTRY_PASSWORD`: DockerHub password.
-    - `REGISTRY_NAME`: DockerHub registry name (e.g., `docker.io`).
-    - `REGISTRY_URL`: URL of the DockerHub registry (e.g., `docker.io/<username>`).
+### Registry credentials
 
-    #### Azure Container Registry (ACR)
-    - `REGISTRY_PROVIDER`: Set to `azure`
-    - `REGISTRY_USERNAME`: ACR username (service principal or admin username).
-    - `REGISTRY_PASSWORD`: ACR password (service principal secret or admin password).
-    - `REGISTRY_NAME`: ACR registry name (e.g., `myregistry.azurecr.io`).
-    - `REGISTRY_URL`: URL of the ACR registry (e.g., `myregistry.azurecr.io`).
+**GitHub Container Registry (GHCR)** — default, no setup needed. Uses the built-in `GITHUB_TOKEN`.
 
-    #### GitHub Container Registry (GHCR)
-    - `REGISTRY_PROVIDER`: Set to any value other than above (default is GHCR)
-    - No additional secrets are required. The workflow uses the built-in `GITHUB_TOKEN` provided by GitHub Actions for authentication.
+**DockerHub**
 
-2. **Environment Variables**:
-   - The following environment variables must be set in the repository or workflow:
-     - `CLOUD_STORE_GROUP_ID`: The group ID for cloud storage dependencies.
-     - `CLOUD_STORE_ARTIFACT_ID`: The artifact ID for cloud storage dependencies.
-     - `CLOUD_STORE_VERSION`: The version of the cloud storage dependencies.
+| Secret | Example |
+|--------|---------|
+| `REGISTRY_USERNAME` | `myusername` |
+| `REGISTRY_PASSWORD` | DockerHub password or access token |
+| `REGISTRY_NAME` | `docker.io` |
 
-Ensure these secrets and variables are added to the repository settings under **Settings > Secrets and variables > Actions**.
-By ensuring these prerequisites are met, the workflows in this repository will execute successfully.
+**Azure Container Registry**
+
+| Secret | Example |
+|--------|---------|
+| `REGISTRY_USERNAME` | ACR username |
+| `REGISTRY_PASSWORD` | ACR password |
+| `REGISTRY_NAME` | `myregistry.azurecr.io` |
+
+**GCP Artifact Registry**
+
+| Secret | Example |
+|--------|---------|
+| `GCP_SERVICE_ACCOUNT_KEY` | Base64-encoded service account JSON key |
+| `REGISTRY_NAME` | `asia-south1-docker.pkg.dev` |
+
+**Amazon ECR**
+
+| Secret | Example |
+|--------|---------|
+| `AWS_ACCESS_KEY_ID` | AWS access key ID |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret access key |
+| `AWS_REGION` | `us-east-1` |
