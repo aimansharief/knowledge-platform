@@ -14,6 +14,8 @@ Play Framework APIs for the Sunbird Knowledge Platform. Each service exposes RES
    - [Verify services](#verify-services)
 4. [Building the Project](#building-the-project)
 5. [Running a Service Locally](#running-a-service-locally)
+   - [Option A — Run an individual service](#option-a--run-an-individual-service)
+   - [Option B — Run Content, Taxonomy, and Assessment together](#option-b--run-content-taxonomy-and-assessment-together)
 6. [Cloud Storage Configuration](#cloud-storage-configuration)
 7. [CI/CD — GitHub Actions](#cicd--github-actions)
 
@@ -108,7 +110,9 @@ A successful build ends with `BUILD SUCCESS`.
 
 ## Running a Service Locally
 
-Each service runs as a standalone Play application using `play2:run`.
+You can either run services individually or run Content, Taxonomy, and Assessment together via `knowlg-service`.
+
+### Option A — Run an individual service
 
 | Service | Module Path | Default Port |
 |---------|-------------|--------------|
@@ -121,10 +125,53 @@ Each service runs as a standalone Play application using `play2:run`.
 
 2. Set the [cloud storage environment variables](#cloud-storage-configuration).
 
-3. Run the service. Example for Content Service:
+3. Run the service. Example for Taxonomy Service:
+
+   **Linux:**
    ```shell
-   cd content-api/content-service
+   cd taxonomy-api/taxonomy-service
    mvn play2:run
+   ```
+
+   **macOS:**
+   ```shell
+   cd taxonomy-api/taxonomy-service
+   mvn play2:dist
+   cd target
+   tar xvzf taxonomy-service-1.0-SNAPSHOT-dist.zip
+   cd taxonomy-service-1.0-SNAPSHOT
+   ./start
+   ```
+
+4. Health check:
+   ```shell
+   curl http://localhost:9000/health
+   ```
+
+### Option B — Run Content, Taxonomy, and Assessment together
+
+The `knowlg-service` module bundles Content, Taxonomy, and Assessment into a single Play application.
+
+1. Make sure all containers from [Local Development Setup](#local-development-setup) are running.
+
+2. Set the [cloud storage environment variables](#cloud-storage-configuration).
+
+3. Build and run:
+
+   **Linux:**
+   ```shell
+   cd knowlg-service
+   mvn play2:run
+   ```
+
+   **macOS:**
+   ```shell
+   cd knowlg-service
+   mvn play2:dist
+   cd target
+   tar xvzf knowlg-service-1.0-SNAPSHOT-dist.zip
+   cd knowlg-service-1.0-SNAPSHOT
+   ./start
    ```
 
 4. Health check:
