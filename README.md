@@ -10,6 +10,7 @@ Play Framework APIs for the Sunbird Knowledge Platform. Each service exposes RES
 2. [Prerequisites](#prerequisites)
 3. [Local Development Setup](#local-development-setup)
    - [Start all services](#start-all-services)
+   - [Initialize YugabyteDB keyspaces](#initialize-yugabytedb-keyspaces)
    - [Redis (optional)](#redis-optional)
    - [Verify services](#verify-services)
 4. [Building the Project](#building-the-project)
@@ -55,13 +56,25 @@ cd docker
 docker compose up -d
 ```
 
-This starts YugabyteDB, JanusGraph, Elasticsearch, and Kafka. JanusGraph automatically initializes the schema on startup via `docker/janusgraph/scripts/schema_init.groovy`.
+This starts YugabyteDB, JanusGraph, Elasticsearch, and Kafka. JanusGraph automatically initializes the graph schema on startup via `docker/janusgraph/scripts/schema_init.groovy`.
 
 Verify JanusGraph schema was initialized:
 ```shell
 docker logs janusgraph | grep "SCHEMA INITIALIZATION"
 # Expected: --- SCHEMA INITIALIZATION COMPLETE ---
 ```
+
+### Initialize YugabyteDB keyspaces
+
+Once YugabyteDB is up, run the CQL migration script to create the required keyspaces and tables. This downloads the migration files from [sunbird-spark-installer](https://github.com/Sunbird-Spark/sunbird-spark-installer/tree/develop/scripts/sunbird-yugabyte-migrations/sunbird-knowlg) and executes them against the local YugabyteDB container.
+
+```shell
+./init-yugabyte.sh              # env=dev, branch=develop
+./init-yugabyte.sh sb           # env=sb, branch=develop
+./init-yugabyte.sh dev main     # env=dev, branch=main
+```
+
+This only needs to be run once (or after `docker compose down -v` which deletes volumes).
 
 ### Redis (optional)
 
