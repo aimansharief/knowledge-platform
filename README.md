@@ -32,6 +32,8 @@ Play Framework APIs for the Sunbird Knowledge Platform. Each service exposes RES
 | `taxonomy-api/taxonomy-service` | Frameworks, categories, terms, channels, licenses |
 | `search-api/search-service` | Composite search across the knowledge graph via Elasticsearch |
 | `assessment-api/assessment-service` | QuestionSets and assessment items |
+| `knowlg-service` | Aggregator service bundling Content, Taxonomy, and Assessment APIs into a single runtime |
+| `platform-modules` | MIME-type management, URL management, and import utilities |
 
 ---
 
