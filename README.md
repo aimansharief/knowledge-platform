@@ -12,8 +12,9 @@ Play Framework APIs for the Sunbird Knowledge Platform. Each service exposes RES
    - [Step 1 — Clone the repository](#step-1--clone-the-repository)
    - [Step 2 — Start infrastructure](#step-2--start-infrastructure)
    - [Step 3 — Initialize YugabyteDB keyspaces](#step-3--initialize-yugabytedb-keyspaces)
-   - [Step 4 — Build the project](#step-4--build-the-project)
-   - [Step 5 — Run a service](#step-5--run-a-service)
+   - [Step 4 — Initialize Elasticsearch indices](#step-4--initialize-elasticsearch-indices)
+   - [Step 5 — Build the project](#step-5--build-the-project)
+   - [Step 6 — Run a service](#step-6--run-a-service)
 4. [Redis (optional)](#redis-optional)
 5. [Cloud Storage Configuration](#cloud-storage-configuration)
 6. [CI/CD — GitHub Actions](#cicd--github-actions)
@@ -92,7 +93,23 @@ This downloads CQL migration files from [sunbird-spark-installer](https://github
 
 You only need to run this once. Run it again after `docker compose down -v` (which deletes volumes).
 
-### Step 4 — Build the project
+### Step 4 — Initialize Elasticsearch indices
+
+Still inside the `docker/` directory, run the Elasticsearch init script to create the required indices and mappings:
+
+```shell
+./init-elasticsearch.sh
+```
+
+This downloads index and mapping definitions from [sunbird-devops](https://github.com/project-sunbird/sunbird-devops/tree/release-8.0.0/ansible/roles/es7-mapping/files) and applies them via the Elasticsearch REST API. By default it uses the `release-8.0.0` branch.
+
+```shell
+./init-elasticsearch.sh release-9.0.0    # use a different branch
+```
+
+You only need to run this once. Run it again after `docker compose down -v` (which deletes volumes).
+
+### Step 5 — Build the project
 
 Go back to the repository root and build:
 
@@ -110,7 +127,7 @@ mvn clean install -DskipTests -Pgcp   # Google Cloud Storage
 mvn clean install -DskipTests -Poci   # Oracle Cloud Infrastructure
 ```
 
-### Step 5 — Run a service
+### Step 6 — Run a service
 
 You can either run services individually or run Content, Taxonomy, and Assessment together via `knowlg-service`.
 
