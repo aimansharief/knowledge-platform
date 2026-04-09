@@ -42,7 +42,7 @@ Make sure these are installed before you begin:
 - **Java 11** — verify with `java -version`
 - **Maven 3.9+** — verify with `mvn -version`
 - **Docker Desktop** — verify with `docker --version`
-  - Allocate at least **6 GB RAM** to Docker Desktop (Settings > Resources > Memory). The default 3.8 GB is not enough — JanusGraph will get OOM-killed.
+  - Allocate at least **6 GB RAM** to Docker Desktop (Settings > Resources > Memory). The default 3.8 GB is not enough.
 - **Git** — verify with `git --version`
 
 ---
