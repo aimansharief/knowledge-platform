@@ -14,6 +14,7 @@ import org.elasticsearch.index.query.Operator;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
+import org.sunbird.search.util.SearchInputValidator;
 import org.elasticsearch.index.query.functionscore.FunctionScoreQueryBuilder;
 import org.elasticsearch.index.query.functionscore.FunctionScoreQueryBuilder.FilterFunctionBuilder;
 import org.elasticsearch.index.query.functionscore.ScoreFunctionBuilders;
@@ -726,7 +727,7 @@ public class SearchProcessor {
 	private QueryBuilder getMatchPhraseQuery(String propertyName, List<Object> values, boolean match) {
 		BoolQueryBuilder queryBuilder = QueryBuilders.boolQuery();
 		for (Object value : values) {
-			String stringValue = String.valueOf(value);
+			String stringValue = SearchInputValidator.escapeRegexValue(String.valueOf(value));
 			if (match) {
 				queryBuilder.should(QueryBuilders
 						.regexpQuery(propertyName,
@@ -748,7 +749,7 @@ public class SearchProcessor {
 	private QueryBuilder getRegexQuery(String propertyName, List<Object> values) {
 		BoolQueryBuilder queryBuilder = QueryBuilders.boolQuery();
 		for (Object value : values) {
-			String stringValue = String.valueOf(value);
+			String stringValue = SearchInputValidator.escapeRegexValue(String.valueOf(value));
 			queryBuilder.should(QueryBuilders.regexpQuery(propertyName,
 					".*" + stringValue.toLowerCase()));
 		}
