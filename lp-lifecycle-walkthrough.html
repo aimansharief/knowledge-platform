@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LP Lifecycle — Interactive Walkthrough</title>
+<style>
+:root{
+ --bg:#0f1116; --panel:#171a21; --panel2:#1e222b; --line:#2b303b; --ink:#e6e9ef; --mut:#8b93a3;
+ --ui:#4dabf7; --cc2:#ff922b; --cc3:#ff6b6b; --reuse:#20c997; --neutral:#adb5bd;
+ --chg:#2a2410; --chgline:#e8b339; --new:#0f2620;
+}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 20px 60px}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--mut);font-size:12.5px;margin-bottom:18px}
+.dots{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.dot{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--panel);
+ color:var(--mut);font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.dot:hover{border-color:var(--ui)}
+.dot.active{background:var(--ui);color:#06121f;border-color:var(--ui)}
+.dot.done{color:var(--ink);border-color:#3a4150}
+.grid{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.badge{display:inline-block;font-weight:800;font-size:12px;padding:3px 9px;border-radius:7px;background:var(--panel2);color:var(--ui);letter-spacing:.5px}
+.title{font-size:16px;font-weight:700;margin:10px 0 8px}
+.event{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--ink);background:#0b0d12;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:12px;word-break:break-word}
+.rule{border-left:3px solid var(--mut);padding:9px 12px;border-radius:0 8px 8px 0;background:var(--panel2);font-size:13px}
+.rule .tag{font-weight:800;font-size:11px;letter-spacing:.4px;display:block;margin-bottom:3px}
+.rule.cc2{border-color:var(--cc2)} .rule.cc2 .tag{color:var(--cc2)}
+.rule.cc3{border-color:var(--cc3)} .rule.cc3 .tag{color:var(--cc3)}
+.rule.reuse{border-color:var(--reuse)} .rule.reuse .tag{color:var(--reuse)}
+.rule.neutral{border-color:var(--neutral)} .rule.neutral .tag{color:var(--neutral)}
+.tbl{margin-bottom:14px}
+.tname{font-weight:800;font-size:12px;letter-spacing:.5px;margin-bottom:5px}
+.tname small{font-weight:500;color:var(--mut);letter-spacing:0;margin-left:6px}
+.ue .tname{color:var(--cc2)} .ucc .tname{color:var(--reuse)} .agg .tname{color:#b197fc}
+table{width:100%;border-collapse:collapse;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+th{text-align:left;color:var(--mut);font-weight:700;padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:10.5px;letter-spacing:.3px}
+td{padding:5px 8px;border-bottom:1px solid #22262f;color:var(--ink);vertical-align:top;white-space:pre-wrap}
+tr.chg td{background:var(--chg)}
+tr.chg td:first-child{box-shadow:inset 3px 0 0 var(--chgline)}
+.empty{color:var(--mut);font-style:italic;padding:6px 8px}
+.nav{display:flex;gap:10px;align-items:center;margin-top:18px}
+button.nav-btn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 16px;font-weight:700;cursor:pointer;font-size:13px}
+button.nav-btn:hover:not(:disabled){border-color:var(--ui)}
+button.nav-btn:disabled{opacity:.4;cursor:default}
+.count{color:var(--mut);font-size:12.5px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--mut);font-size:11.5px;margin-top:14px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.lg-chg::before{background:var(--chgline)} .lg-cc2::before{background:var(--cc2)} .lg-cc3::before{background:var(--cc3)} .lg-reuse::before{background:var(--reuse)}
+.formula{margin-top:14px;color:var(--mut);font-size:11.5px;font-family:ui-monospace,monospace;background:var(--panel);border:1px dashed var(--line);border-radius:8px;padding:9px 11px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+</style></head>
+<body><div class="wrap">
+<h1>Learning Path Lifecycle — Interactive Walkthrough</h1>
+<div class="sub">Enrollable-assessment, auto-on-unlock enrol. Step through each stage; the three tables update live. <b>Yellow bar = row written or changed this stage.</b></div>
+<div class="dots" id="dots"></div>
+<div class="grid">
+ <div class="card" id="left"></div>
+ <div class="card" id="right"></div>
+</div>
+<div class="nav">
+ <button class="nav-btn" id="prev">‹ Prev</button>
+ <button class="nav-btn" id="next">Next ›</button>
+ <span class="count" id="count"></span>
+</div>
+<div class="legend">
+ <span class="lg-chg">changed / new row this stage</span>
+ <span class="lg-cc2">[CC2] auto-on-unlock enrol</span>
+ <span class="lg-cc3">[CC3] LP aggregator</span>
+ <span class="lg-reuse">reused (existing aggregator)</span>
+</div>
+<div class="formula">UI never enrols — reads via POST /activity/state/read.&nbsp;&nbsp;progress = |activitystatus done ∪ optional_activity| / N&nbsp;&nbsp;(N = Courses + Level-assessment + post; pre excluded).</div>
+</div>
+<script>
+const STAGES = [{"id": "A", "title": "USER enrols into the Learning Path", "event": "POST /activity/enroll", "rule": "Backend creates the LP user_enrolments row. No children yet \u2014 enrolment is deferred, not upfront.", "rule_tag": "neutral", "ue": [{"id": "do_lp_id", "type": "LearningPath", "status": "{}", "prog": "0", "st": "\u2014", "extra": "optional=[]", "chg": true}], "ucc": [], "agg": []}, {"id": "B", "title": "Backend auto-enrols the PRE-assessment (first gate)", "event": "(internal) POST /activity/enroll  \u00b7  qsPre", "rule": "[CC2] Auto-on-unlock enrol: the backend enrols ONLY the pre-PQS at start. The UI makes zero enrol calls.", "rule_tag": "cc2", "ue": [{"id": "do_lp_id", "type": "LearningPath", "status": "{}", "prog": "0", "st": "\u2014", "extra": "optional=[]", "chg": false}, {"id": "do_pre_id", "type": "PracticeQuestionSet", "status": "{}", "prog": "0", "st": "\u2014", "extra": "", "chg": true}], "ucc": [], "agg": []}, {"id": "C", "title": "USER consumes the PRE-assessment", "event": "PATCH /content/state/update  (assessmentEvents)", "rule": "PQS self-completion is free: a published QuestionSet has leafNodesCount=1, so the existing ActivityAggregatorActor computes 1/1 \u2192 100% \u2192 status=2. assessment_aggregator stores score + per-question UDT.", "rule_tag": "reuse", "ue": [{"id": "do_lp_id", "type": "LearningPath", "status": "{}", "prog": "0", "st": "\u2014", "extra": "optional=[]", "chg": false}, {"id": "do_pre_id", "type": "PracticeQuestionSet", "status": "{do_pre_id:2}", "prog": "100", "st": "2", "extra": "", "chg": true}], "ucc": [{"coll": "do_pre_id", "batch": "b1:do_pre_id", "content": "do_pre_id", "st": "2", "chg": true}], "agg": [{"course": "do_pre_id", "batch": "b1:do_pre_id", "q": "[{id,score,max}]", "score": "TOTAL_SCORE", "chg": true}]}, {"id": "D", "title": "LP AGGREGATOR: rollup + diagnostic waiver \u2192 unlock L1", "event": "(internal) POST /activity/enroll  \u00b7  C1, qsA", "rule": "[CC3] Waiver: correct qIds (score>0) \u2192 proven Leaf Competencies. Any Course whose leafCompetencies \u2286 proven is waived into optional_activity (never enrolled). Then L1 unlocks and its REQUIRED activities (C1 + Level-Assess) are auto-enrolled.", "rule_tag": "cc3", "ue": [{"id": "do_lp_id", "type": "LearningPath", "status": "{do_pre_id:2}", "prog": "recompute", "st": "\u2014", "extra": "optional=[do_c2_id]", "chg": true}, {"id": "do_pre_id", "type": "PracticeQuestionSet", "status": "{do_pre_id:2}", "prog": "100", "st": "2", "extra": "", "chg": false}, {"id": "do_c1_id", "type": "Course", "status": "{}", "prog": "0", "st": "\u2014", "extra": "", "chg": true}, {"id": "do_la_id", "type": "PracticeQuestionSet", "status": "{}", "prog": "0", "st": "\u2014", "extra": "", "chg": true}], "ucc": [{"coll": "do_pre_id", "batch": "b1:do_pre_id", "content": "do_pre_id", "st": "2", "chg": false}], "agg": [{"course": "do_pre_id", "batch": "b1:do_pre_id", "q": "[{id,score,max}]", "score": "TOTAL_SCORE", "chg": false}]}, {"id": "E", "title": "USER consumes COURSE C1 content \u2192 LP rollup", "event": "PATCH /content/state/update  (contents)", "rule": "[CC3] Child rollup: C1 completes \u2192 emits enrol-complete \u2192 LP aggregator sets activitystatus[C1]=2 and recomputes LP progress. One trigger, one path.", "rule_tag": "cc3", "ue": [{"id": "do_lp_id", "type": "LearningPath", "status": "{do_pre_id:2, do_c1_id:2}", "prog": "recompute", "st": "\u2014", "extra": "optional=[do_c2_id]", "chg": true}, {"id": "do_pre_id", "type": "PracticeQuestionSet", "status": "{do_pre_id:2}", "prog": "100", "st": "2", "extra": "", "chg": false}, {"id": "do_c1_id", "type": "Course", "status": "{c1:2, c2:2}", "prog": "100", "st": "2", "extra": "", "chg": true}, {"id": "do_la_id", "type": "PracticeQuestionSet", "status": "{}", "prog": "0", "st": "\u2014", "extra": "", "chg": false}], "ucc": [{"coll": "do_pre_id", "batch": "b1:do_pre_id", "content": "do_pre_id", "st": "2", "chg": false}, {"coll": "do_c1_id", "batch": "b1:do_c1_id", "content": "do_content_id", "st": "2", "chg": true}], "agg": [{"course": "do_pre_id", "batch": "b1:do_pre_id", "q": "[{id,score,max}]", "score": "TOTAL_SCORE", "chg": false}]}, {"id": "F", "title": "USER submits the LEVEL-ASSESSMENT \u2192 pass-gate", "event": "PATCH /content/state/update  (assessmentEvents)", "rule": "[CC3] Pass-gate: LP.activitystatus[qsA] = 2 IF best total_score \u2265 cutoff, ELSE 1. The PQS row still self-completes (status=2); the pass/fail verdict lives on the LP row.", "rule_tag": "cc3", "ue": [{"id": "do_lp_id", "type": "LearningPath", "status": "{...,do_la_id: PASS?2:1}", "prog": "recompute", "st": "\u2014", "extra": "optional=[do_c2_id]", "chg": true}, {"id": "do_pre_id", "type": "PracticeQuestionSet", "status": "{do_pre_id:2}", "prog": "100", "st": "2", "extra": "", "chg": false}, {"id": "do_c1_id", "type": "Course", "status": "{c1:2, c2:2}", "prog": "100", "st": "2", "extra": "", "chg": false}, {"id": "do_la_id", "type": "PracticeQuestionSet", "status": "(rolls up to LP)", "prog": "100", "st": "2", "extra": "", "chg": true}], "ucc": [{"coll": "do_pre_id", "batch": "b1:do_pre_id", "content": "do_pre_id", "st": "2", "chg": false}, {"coll": "do_c1_id", "batch": "b1:do_c1_id", "content": "do_content_id", "st": "2", "chg": false}, {"coll": "do_la_id", "batch": "b1:do_la_id", "content": "do_la_id", "st": "2", "chg": true}], "agg": [{"course": "do_pre_id", "batch": "b1:do_pre_id", "q": "[{id,score,max}]", "score": "TOTAL_SCORE", "chg": false}, {"course": "do_la_id", "batch": "b1:do_la_id", "q": "[{id,score,max}]", "score": "TOTAL_SCORE", "chg": true}]}, {"id": "G", "title": "L1 done \u2192 L2 WAIVED (skip) \u2192 L3 unlock \u2192 auto-enrol POST", "event": "(internal) POST /activity/enroll  \u00b7  qsPost", "rule": "[CC3] Level unlock: when all COUNTED children of a level are done, the next unlocks. C2 \u2208 optional_activity means L2 has nothing required \u2192 it auto-completes \u2192 L3 unlocks \u2192 post-PQS is auto-enrolled.", "rule_tag": "cc3", "ue": [{"id": "do_lp_id", "type": "LearningPath", "status": "{...,do_la_id: PASS?2:1}", "prog": "recompute", "st": "\u2014", "extra": "optional=[do_c2_id]", "chg": false}, {"id": "do_pre_id", "type": "PracticeQuestionSet", "status": "{do_pre_id:2}", "prog": "100", "st": "2", "extra": "", "chg": false}, {"id": "do_c1_id", "type": "Course", "status": "{c1:2, c2:2}", "prog": "100", "st": "2", "extra": "", "chg": false}, {"id": "do_la_id", "type": "PracticeQuestionSet", "status": "(rolls up to LP)", "prog": "100", "st": "2", "extra": "", "chg": false}, {"id": "do_post_id", "type": "PracticeQuestionSet", "status": "{}", "prog": "0", "st": "\u2014", "extra": "", "chg": true}], "ucc": [{"coll": "do_pre_id", "batch": "b1:do_pre_id", "content": "do_pre_id", "st": "2", "chg": false}, {"coll": "do_c1_id", "batch": "b1:do_c1_id", "content": "do_content_id", "st": "2", "chg": false}, {"coll": "do_la_id", "batch": "b1:do_la_id", "content": "do_la_id", "st": "2", "chg": false}], "agg": [{"course": "do_pre_id", "batch": "b1:do_pre_id", "q": "[{id,score,max}]", "score": "TOTAL_SCORE", "chg": false}, {"course": "do_la_id", "batch": "b1:do_la_id", "q": "[{id,score,max}]", "score": "TOTAL_SCORE", "chg": false}]}, {"id": "H", "title": "USER submits POST-assessment \u2192 LP COMPLETION", "event": "PATCH /content/state/update  (assessmentEvents)", "rule": "[CC3] Completion: if ALL counted children are done AND the post passed \u2192 LP status=2, completedon set, certificate issued.", "rule_tag": "cc3", "ue": [{"id": "do_lp_id", "type": "LearningPath", "status": "{all: 2}", "prog": "100", "st": "2", "extra": "COMPLETEDON + CERTIFICATE", "chg": true}, {"id": "do_pre_id", "type": "PracticeQuestionSet", "status": "{do_pre_id:2}", "prog": "100", "st": "2", "extra": "", "chg": false}, {"id": "do_c1_id", "type": "Course", "status": "{c1:2, c2:2}", "prog": "100", "st": "2", "extra": "", "chg": false}, {"id": "do_la_id", "type": "PracticeQuestionSet", "status": "(rolls up to LP)", "prog": "100", "st": "2", "extra": "", "chg": false}, {"id": "do_post_id", "type": "PracticeQuestionSet", "status": "(rolls up to LP)", "prog": "100", "st": "2", "extra": "", "chg": true}], "ucc": [{"coll": "do_pre_id", "batch": "b1:do_pre_id", "content": "do_pre_id", "st": "2", "chg": false}, {"coll": "do_c1_id", "batch": "b1:do_c1_id", "content": "do_content_id", "st": "2", "chg": false}, {"coll": "do_la_id", "batch": "b1:do_la_id", "content": "do_la_id", "st": "2", "chg": false}, {"coll": "do_post_id", "batch": "b1:do_post_id", "content": "do_post_id", "st": "2", "chg": true}], "agg": [{"course": "do_pre_id", "batch": "b1:do_pre_id", "q": "[{id,score,max}]", "score": "TOTAL_SCORE", "chg": false}, {"course": "do_la_id", "batch": "b1:do_la_id", "q": "[{id,score,max}]", "score": "TOTAL_SCORE", "chg": false}, {"course": "do_post_id", "batch": "b1:do_post_id", "q": "[{id,score,max}]", "score": "TOTAL_SCORE", "chg": true}]}];
+let i = 0;
+const $ = s => document.querySelector(s);
+function tbl(cls,name,full,cols,rows,render){
+ let h = '<div class="tbl '+cls+'"><div class="tname">'+name+' <small>'+full+'</small></div><table><thead><tr>';
+ h += cols.map(c=>'<th>'+c+'</th>').join('') + '</tr></thead><tbody>';
+ if(!rows.length){ h+='<tr><td colspan="'+cols.length+'" class="empty">(empty)</td></tr>'; }
+ else rows.forEach(r=>{ h+='<tr class="'+(r.chg?'chg':'')+'">'+render(r)+'</tr>'; });
+ return h+'</tbody></table></div>';
+}
+function render(){
+ const s = STAGES[i];
+ // dots
+ $('#dots').innerHTML = STAGES.map((x,j)=>'<div class="dot '+(j===i?'active':(j<i?'done':''))+'" data-j="'+j+'">'+x.id+'</div>').join('');
+ document.querySelectorAll('.dot').forEach(d=>d.onclick=()=>{i=+d.dataset.j;render();});
+ // left
+ $('#left').innerHTML =
+  '<span class="badge">STAGE '+s.id+'</span>'+
+  '<div class="title">'+s.title+'</div>'+
+  '<div class="event">'+s.event+'</div>'+
+  '<div class="rule '+s.rule_tag+'"><span class="tag">'+
+     ({cc2:'AUTO-ON-UNLOCK ENROL [CC2]',cc3:'LP AGGREGATOR [CC3]',reuse:'REUSED — EXISTING AGGREGATOR',neutral:'BACKEND'}[s.rule_tag])+
+   '</span>'+s.rule+'</div>';
+ // right
+ let h='';
+ h+=tbl('ue','UE','user_enrolments',['ACTIVITY_ID','TYPE','ACTIVITY_STATUS','PROG','ST','OPTIONAL / extra'],s.ue,
+   r=>'<td>'+r.id+'</td><td>'+r.type+'</td><td>'+r.status+'</td><td>'+r.prog+'</td><td>'+r.st+'</td><td>'+r.extra+'</td>');
+ h+=tbl('ucc','UCC','user_content_consumption',['COLLECTION_ID','BATCH_ID','CONTENT_ID','ST'],s.ucc,
+   r=>'<td>'+r.coll+'</td><td>'+r.batch+'</td><td>'+r.content+'</td><td>'+r.st+'</td>');
+ h+=tbl('agg','AGG','assessment_aggregator',['COURSE_ID','BATCH_ID','QUESTION','TOTAL_SCORE'],s.agg,
+   r=>'<td>'+r.course+'</td><td>'+r.batch+'</td><td>'+r.q+'</td><td>'+r.score+'</td>');
+ $('#right').innerHTML = h;
+ $('#count').textContent = 'Stage '+(i+1)+' of '+STAGES.length;
+ $('#prev').disabled = i===0; $('#next').disabled = i===STAGES.length-1;
+}
+$('#prev').onclick=()=>{if(i>0){i--;render();}};
+$('#next').onclick=()=>{if(i<STAGES.length-1){i++;render();}};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')$('#next').click();if(e.key==='ArrowLeft')$('#prev').click();});
+render();
+</script></body></html>
